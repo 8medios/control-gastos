@@ -1,9 +1,9 @@
 <script lang="ts">
   import AddExpense from "$lib/components/AddExpense.svelte";
   import ExpenseItem from "$lib/components/ExpenseItem.svelte";
-  import type { Expense, BudgetConfig } from "$lib/types"; // Importar BudgetConfig
+  import type { Expense, BudgetConfig } from "$lib/types";
   import { expenses } from "$lib/stores";
-  import { budget } from "$lib/config"; // Ahora este store contiene BudgetConfig
+  import { budget } from "$lib/config";
 
   const handleAddExpense = (e: CustomEvent<Expense>) => {
     expenses.update((list) => [e.detail, ...list]);
@@ -21,11 +21,30 @@
   const handleStartEditing = (e: CustomEvent<string>) => {
     const idToEdit = e.detail;
     const expenseToEdit = $expenses.find((expense) => expense.id === idToEdit);
-    editingExpense = expenseToEdit || null;
+
+    // Verificación mejorada (del arreglo anterior)
+    if (
+      expenseToEdit &&
+      expenseToEdit.id &&
+      expenseToEdit.name !== undefined &&
+      expenseToEdit.amount !== undefined
+    ) {
+      // Hacemos una copia simple del objeto para evitar que las ediciones directas afecten el store antes de guardar
+      // Aunque con bind:value a una propiedad de un objeto en un let variable no es estrictamente necesario en este caso simple,
+      // es buena práctica si el objeto viene directamente de un store más complejo o si se añade funcionalidad de cancelar con reset.
+      editingExpense = { ...expenseToEdit }; // Copia el objeto
+    } else {
+      console.warn(
+        "Intento de editar un gasto inválido o no encontrado:",
+        idToEdit,
+        expenseToEdit
+      );
+      editingExpense = null;
+    }
   };
 
   const handleCancelEditing = () => {
-    editingExpense = null;
+    editingExpense = null; // Oculta el modal
   };
 
   const handleUpdateExpense = () => {
@@ -37,56 +56,59 @@
       console.warn(
         "Por favor, completa el nombre y el monto correctamente al editar."
       );
+      // Podrías añadir lógica para mostrar mensajes de error en el formulario del modal
       return;
     }
 
     expenses.update((list) => {
       return list.map((expense) => {
         if (expense.id === editingExpense?.id) {
+          // Devuelve el objeto editingExpense que contiene los datos modificados del formulario del modal
           return editingExpense;
         }
         return expense;
       });
     });
 
-    editingExpense = null;
+    editingExpense = null; // Oculta el modal después de guardar
   };
 
-  // ** CÁLCULOS BASADOS EN EL PERIODO DE PRESUPUESTO **
-
-  // El total de gastos ahora suma solo los gastos DENTRO del periodo actual
+  // Cálculos basados en el periodo de presupuesto (sin cambios)
   $: totalGastos = $expenses.reduce((acc, item) => {
-    // Parsear las fechas para comparar, o comparar las strings ISO directamente si están en YYYY-MM-DD
     const expenseDate = item.date;
     const startDate = $budget.startDate;
-
-    // Determinar la fecha de fin del periodo (ej. un mes después de startDate)
     const start = new Date(startDate);
-    const endDate = new Date(
+    // Periodo de un mes exacto a partir de la fecha de inicio (ej. 15/05 a 14/06)
+    const endOfPeriod = new Date(
       start.getFullYear(),
       start.getMonth() + 1,
-      start.getDate() - 1
-    )
+      start.getDate()
+    );
+    const endDate = new Date(endOfPeriod.getTime() - 1000 * 60 * 60 * 24)
       .toISOString()
-      .slice(0, 10); // Fin del mes
+      .slice(0, 10); // Un día antes
 
-    // Comparar fechas: item.date >= startDate Y item.date <= endDate
     if (expenseDate >= startDate && expenseDate <= endDate) {
       return acc + item.amount;
     }
     return acc;
   }, 0);
 
-  $: restante = $budget.amount - totalGastos; // Usamos $budget.amount
-  $: diasTotalesPeriodo = calcularDiasTotalesPeriodo($budget.startDate); // Necesitamos esta función
-  $: diasRestantesPeriodo = calcularDiasRestantesPeriodo($budget.startDate); // Necesitamos esta función
-  $: diario = (restante / diasRestantesPeriodo).toFixed(2);
-  $: semanal = (restante / (diasRestantesPeriodo / 7)).toFixed(2); // Semanas restantes
+  $: restante = $budget.amount - totalGastos;
+  $: diasTotalesPeriodo = calcularDiasTotalesPeriodo($budget.startDate);
+  $: diasRestantesPeriodo = calcularDiasRestantesPeriodo($budget.startDate);
 
-  // Función para calcular el número total de días en el periodo
+  // Manejar división por cero si no quedan días o el periodo es raro
+  $: diario = (
+    restante / (diasRestantesPeriodo > 0 ? diasRestantesPeriodo : 1)
+  ).toFixed(2);
+  $: semanal = (
+    restante / (diasRestantesPeriodo > 0 ? diasRestantesPeriodo / 7 : 1)
+  ).toFixed(2);
+
+  // Funciones de cálculo de días del periodo (sin cambios)
   function calcularDiasTotalesPeriodo(startDateString: string): number {
     const start = new Date(startDateString);
-    // El periodo termina un mes después del día de inicio (ej. 15 Mayo -> 14 Junio)
     const endOfPeriod = new Date(
       start.getFullYear(),
       start.getMonth() + 1,
@@ -97,16 +119,13 @@
     return diffDays;
   }
 
-  // Función para calcular los días restantes en el periodo
   function calcularDiasRestantesPeriodo(startDateString: string): number {
     const hoy = new Date();
-    // Asegurarse de comparar solo la parte de la fecha
     hoy.setHours(0, 0, 0, 0);
 
     const start = new Date(startDateString);
     start.setHours(0, 0, 0, 0);
 
-    // El periodo termina un mes después del día de inicio
     const endOfPeriod = new Date(
       start.getFullYear(),
       start.getMonth() + 1,
@@ -114,24 +133,17 @@
     );
     endOfPeriod.setHours(0, 0, 0, 0);
 
-    // Si hoy es ANTES del inicio del periodo, los días restantes son los días totales del periodo
     if (hoy < start) {
       return calcularDiasTotalesPeriodo(startDateString);
     }
-    // Si hoy es DESPUÉS del fin del periodo, los días restantes son 0
     if (hoy >= endOfPeriod) {
       return 0;
     }
 
-    // Si hoy está DENTRO del periodo
     const diffTime = endOfPeriod.getTime() - hoy.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Usamos ceil para contar el día actual
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   }
-
-  // Las funciones anteriores diasRestantes y semanasRestantes ya no son necesarias
-  // function diasRestantes(): number { /* ... */ }
-  // function semanasRestantes(): number { /* ... */ }
 
   const clearExpenses = () => {
     if (confirm("¿Borrar todos los gastos?")) {
@@ -158,7 +170,7 @@
     "Otros",
   ];
 
-  // ** MEJORAS DE ESTILO EN LA SECCIÓN DE RESUMEN **
+  // Cálculos para la barra de progreso (sin cambios)
   $: porcentajeGastado =
     $budget.amount > 0
       ? Math.min((totalGastos / $budget.amount) * 100, 100)
@@ -178,6 +190,7 @@
     <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">
       Resumen del Periodo
     </h2>
+
     <div class="grid grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
       <p>
         <strong class="block text-sm">Presupuesto:</strong>
@@ -227,90 +240,97 @@
   </section>
 
   {#if editingExpense}
-    <section
-      class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md max-w-md w-full"
+    <div
+      class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-75 flex items-center justify-center p-4 z-50"
     >
-      <h2 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">
-        Editar Gasto
-      </h2>
-      <form on:submit|preventDefault={handleUpdateExpense} class="space-y-2">
-        <div>
-          <label
-            for="edit-name"
-            class="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >Nombre</label
-          >
-          <input
-            id="edit-name"
-            bind:value={editingExpense.name}
-            type="text"
-            class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-        <div>
-          <label
-            for="edit-amount"
-            class="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >Monto ($)</label
-          >
-          <input
-            id="edit-amount"
-            bind:value={editingExpense.amount}
-            type="number"
-            min="0"
-            class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-        <div>
-          <label
-            for="edit-date"
-            class="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >Fecha</label
-          >
-          <input
-            id="edit-date"
-            bind:value={editingExpense.date}
-            type="date"
-            class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-        <div>
-          <label
-            for="edit-category"
-            class="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >Categoría</label
-          >
-          <select
-            id="edit-category"
-            bind:value={editingExpense.category}
-            class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            {#each categories as cat}
-              <option value={cat}>{cat}</option>
-            {/each}
-            {#if editingExpense.category === undefined}
-              <option value="Otros" selected>Otros</option>
-            {/if}
-          </select>
-        </div>
+      <section
+        class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl max-w-md w-full max-h-full overflow-y-auto"
+      >
+        <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">
+          Editar Gasto
+        </h2>
+        <form on:submit|preventDefault={handleUpdateExpense} class="space-y-4">
+          <div>
+            <label
+              for="edit-name"
+              class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200"
+              >Nombre</label
+            >
+            <input
+              id="edit-name"
+              bind:value={editingExpense.name}
+              type="text"
+              class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          <div>
+            <label
+              for="edit-amount"
+              class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200"
+              >Monto ($)</label
+            >
+            <input
+              id="edit-amount"
+              bind:value={editingExpense.amount}
+              type="number"
+              min="0"
+              step="0.01"
+              class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          <div>
+            <label
+              for="edit-date"
+              class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200"
+              >Fecha</label
+            >
+            <input
+              id="edit-date"
+              bind:value={editingExpense.date}
+              type="date"
+              class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          <div>
+            <label
+              for="edit-category"
+              class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200"
+              >Categoría</label
+            >
+            <select
+              id="edit-category"
+              bind:value={editingExpense.category}
+              class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              {#each categories as cat}
+                <option value={cat}>{cat}</option>
+              {/each}
+              {#if editingExpense.category === undefined}
+                <option value="Otros" selected>Otros</option>
+              {/if}
+            </select>
+          </div>
 
-        <div class="flex gap-4 justify-end mt-4">
-          <button
-            type="button"
-            on:click={handleCancelEditing}
-            class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold transition"
+          <div
+            class="flex gap-4 justify-end pt-4 border-t border-gray-200 dark:border-gray-700 mt-4"
           >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold transition"
-          >
-            Guardar Cambios
-          </button>
-        </div>
-      </form>
-    </section>
+            <button
+              type="button"
+              on:click={handleCancelEditing}
+              class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold transition"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold transition"
+            >
+              Guardar Cambios
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   {/if}
 
   <section class="w-full max-w-md space-y-2">
