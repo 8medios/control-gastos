@@ -1,16 +1,22 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import type { BudgetConfig } from './types'; // Importar el nuevo tipo
 
-const defaultBudget = 100000; // valor por defecto
+// Valor por defecto para la configuración
+const defaultBudgetConfig: BudgetConfig = {
+    amount: 100000, // valor por defecto del monto
+    startDate: new Date().toISOString().slice(0, 10) // Por defecto, hoy
+};
 
-const initial = browser
-	? parseFloat(localStorage.getItem('budget') || String(defaultBudget))
-	: defaultBudget;
+const initialConfig: BudgetConfig = browser
+	? JSON.parse(localStorage.getItem('budgetConfig') || JSON.stringify(defaultBudgetConfig))
+	: defaultBudgetConfig;
 
-export const budget = writable<number>(initial);
+// El store ahora es Writable de BudgetConfig
+export const budget = writable<BudgetConfig>(initialConfig);
 
 if (browser) {
 	budget.subscribe((val) => {
-		localStorage.setItem('budget', val.toString());
+		localStorage.setItem('budgetConfig', JSON.stringify(val));
 	});
 }
