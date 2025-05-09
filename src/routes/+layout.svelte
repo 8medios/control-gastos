@@ -8,7 +8,7 @@
 			<h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">💸 Control de Gastos</h1>
 			<nav class="flex gap-4">
 				<a href="/" class="text-gray-700 font-bold hover:text-indigo-600 dark:text-gray-300">Inicio</a>
-				<a href="/configuracion" class="text-gray-700 font-bold hover:text-indigo-600 dark:text-gray-300">Configuración</a>
+				<a href="/configuration" class="text-gray-700 font-bold hover:text-indigo-600 dark:text-gray-300">Configuración</a>
 			</nav>
 		</div>
 	</header>
