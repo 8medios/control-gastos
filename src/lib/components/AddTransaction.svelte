@@ -7,15 +7,18 @@
   let amount: number | "" = "";
   let date = new Date().toISOString().slice(0, 10);
   let transactionType: "expense" | "income" = "expense";
-  let category: string = "Otros"; // Valor por defecto
+  let category: string = "Otros";
 
-  // ** Estado local para errores de validación **
+  // ** NO NECESITAS DECLARAR $$restProps con export let aquí **
+  // export let $$restProps; // <--- ELIMINA ESTA LÍNEA
+
+  // Estado local para errores de validación
   let nameError: string | null = null;
   let amountError: string | null = null;
   let dateError: string | null = null;
-  let categoryError: string | null = null; // Para gastos
+  let categoryError: string | null = null;
 
-  // Función de validación
+  // Función de validación (sin cambios)
   function validateForm(): boolean {
     // Resetear errores
     nameError = null;
@@ -25,50 +28,39 @@
 
     let isValid = true;
 
-    // Validación del nombre/descripción
     if (!name.trim()) {
       nameError = "La descripción no puede estar vacía.";
       isValid = false;
     }
 
-    // Validación del monto
-    // Comprobar si es un número válido y positivo
-    const numericAmount = +amount; // Convierte a número
+    const numericAmount = +amount;
     if (amount === "" || isNaN(numericAmount) || numericAmount <= 0) {
       amountError = "El monto debe ser un número positivo.";
       isValid = false;
     }
 
-    // Validación de la fecha (básica)
     if (!date || !date.match(/^\d{4}-\d{2}-\d{2}$/)) {
       dateError = "Formato de fecha inválido.";
       isValid = false;
     }
 
-    // Validación de categoría (solo para gastos, si se muestra el campo)
-    if (transactionType === "expense" && !category) {
-      // Esta validación es relevante si tuvieras una opción vacía o null en el select
-      // Con 'Otros' como defecto y valor, esta check específica podría no ser necesaria,
-      // pero la dejo como patrón. Podrías necesitarla si modificas las opciones del select.
-      categoryError = "Debes seleccionar una categoría para gastos.";
-      isValid = false;
-    }
+    // La validación de categoría puede depender de cómo implementes el select,
+    // con 'Otros' como defecto y valor, quizás no necesites validar que esté vacío.
+    // if (transactionType === 'expense' && !category) { /* ... */ }
 
     return isValid;
   }
 
   const handleSubmit = () => {
-    // Ejecutar validación
     if (!validateForm()) {
       console.warn("Errores de validación en el formulario de añadir.");
-      return; // Detiene el envío si la validación falla
+      return;
     }
 
-    // Si la validación pasa, creamos y despachamos la transacción
     const newTransaction: Transaction = {
       id: uuid(),
       name,
-      amount: +amount, // Aseguramos que sea número
+      amount: +amount,
       date,
       type: transactionType,
       category: transactionType === "expense" ? category : undefined,
@@ -89,18 +81,12 @@
   };
 
   // Opcional: Resetear errores si el usuario cambia de tipo de transacción
-  $: {
-    // Esto se ejecuta cuando transactionType cambia
-    // Podrías decidir resetear solo ciertos errores o todos
-    // nameError = null;
-    // amountError = null;
-    // dateError = null;
-    // categoryError = null; // Si cambias de gasto a ingreso, el error de categoría ya no aplica
-  }
+  // $: { ... }
 </script>
 
 <div
-  class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md max-w-md w-full"
+  {...$$restProps}
+  class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md w-full space-y-4"
 >
   <h2 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">
     Nueva Transacción

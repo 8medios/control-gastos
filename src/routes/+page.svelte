@@ -266,138 +266,88 @@
         : "bg-red-500";
 </script>
 
-<main class="p-4 flex flex-col items-center gap-6">
-  <section
-    class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full max-w-md space-y-4"
-  >
-    <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">
-      Resumen del Periodo
-    </h2>
-    <div class="grid grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
-      <p>
-        <strong class="block text-sm">Presupuesto Inicial:</strong>
-        <span class="text-lg font-semibold">${$budget.amount.toFixed(2)}</span>
-      </p>
-      <p>
-        <strong class="block text-sm">Ingresos (periodo):</strong>
-        <span class="text-lg font-semibold text-green-600 dark:text-green-400"
-          >${totalIngresos.toFixed(2)}</span
-        >
-      </p>
-      <p>
-        <strong class="block text-sm">Gastos (periodo):</strong>
-        <span class="text-lg font-semibold text-red-600 dark:text-red-400"
-          >${totalGastos.toFixed(2)}</span
-        >
-      </p>
-      <p>
-        <strong class="block text-sm">Restante:</strong>
-        <span class="text-lg font-semibold text-green-600 dark:text-green-400"
-          >${restante.toFixed(2)}</span
-        >
-      </p>
-      <p>
-        <strong class="block text-sm">Días restantes:</strong>
-        <span class="text-lg font-semibold">{diasRestantesPeriodo}</span>
-      </p>
-      <p>
-        <strong class="block text-sm">Fondos Disponibles:</strong>
-        <span class="text-lg font-semibold"
-          >${totalFondosDisponibles.toFixed(2)}</span
-        >
-      </p>
-    </div>
-    <div class="w-full mt-4">
-      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        Gasto vs Fondos Disponibles ({porcentajeGastado.toFixed(1)}%)
-      </h3>
+<main class="p-4 flex flex-col gap-6 mx-auto w-full lg:max-w-screen-lg"> <section class="flex flex-col md:flex-row gap-6"> <section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full md:w-1/2 md:max-w-none space-y-4"> <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">Resumen del Periodo</h2>
+
+  <div class="grid grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
+      <p><strong class="block text-sm">Presupuesto Inicial:</strong> <span class="text-lg font-semibold">${$budget.amount.toFixed(2)}</span></p>
+      <p><strong class="block text-sm">Ingresos (periodo):</strong> <span class="text-lg font-semibold text-green-600 dark:text-green-400">${totalIngresos.toFixed(2)}</span></p>
+      <p><strong class="block text-sm">Gastos (periodo):</strong> <span class="text-lg font-semibold text-red-600 dark:text-red-400">${totalGastos.toFixed(2)}</span></p>
+      <p><strong class="block text-sm">Restante:</strong> <span class="text-lg font-semibold text-green-600 dark:text-green-400">${restante.toFixed(2)}</span></p>
+       <p><strong class="block text-sm">Días restantes:</strong> <span class="text-lg font-semibold">{diasRestantesPeriodo}</span></p>
+       <p><strong class="block text-sm">Fondos Disponibles:</strong> <span class="text-lg font-semibold">${totalFondosDisponibles.toFixed(2)}</span></p>
+  </div>
+
+  <div class="w-full mt-4">
+      <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gasto vs Fondos Disponibles ({porcentajeGastado.toFixed(1)}%)</h3>
       <div class="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-        <div
-          class="{progresoColor} h-2 rounded-full"
-          style="width: {porcentajeGastado}%;"
-        ></div>
+          <div class="{progresoColor} h-2 rounded-full" style="width: {porcentajeGastado}%;"></div>
       </div>
-    </div>
-    <div
-      class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-2 text-gray-700 dark:text-gray-300"
-    >
-      <p>
-        <strong class="block text-sm">Disponible por día:</strong>
-        <span class="text-lg font-semibold">${diario}</span>
-      </p>
-      <p>
-        <strong class="block text-sm">Disponible por semana:</strong>
-        <span class="text-lg font-semibold">${semanal}</span>
-      </p>
-    </div>
-  </section>
+  </div>
 
-  {#if editingExpense}
-    <EditTransactionModal
-      transaction={editingExpense}
-      {categories}
-      on:save={handleModalSave}
-      on:cancel={handleModalCancel}
-    />
-  {/if}
+  <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+       <p><strong class="block text-sm">Disponible por día:</strong> <span class="text-lg font-semibold">${diario}</span></p>
+       <p><strong class="block text-sm">Disponible por semana:</strong> <span class="text-lg font-semibold">${semanal}</span></p>
+  </div>
+</section>
 
-  {#if isConfirmDeleteOpen}
-    <ConfirmModal
-      title="Confirmar Eliminación"
-      message={confirmDeleteMessage}
-      on:confirm={handleConfirmDelete}
-      on:cancel={handleCancelDelete}
-    />
-  {/if}
+<section class="w-full md:w-1/2 md:max-w-none flex flex-col gap-6"> <div class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 space-y-2"> <label for="categoria" class="font-semibold block">Filtrar por categoría (Gastos):</label>
+      <select
+          id="categoria"
+          bind:value={categoriaSeleccionada}
+          class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+      >
+          <option value="Todas">Todas las categorías</option>
+          <option value="Alimentación">Alimentación</option>
+          <option value="Transporte">Transporte</option>
+          <option value="Entretenimiento">Entretenimiento</option>
+          <option value="Salud">Salud</option>
+          <option value="Educación">Educación</option>
+          <option value="Otros">Otros</option>
+      </select>
+  </div>
 
-  {#if isConfirmClearAllOpen}
-    <ConfirmModal
-      title="Confirmar Limpiar Todo"
-      message={confirmClearAllMessage}
-      confirmButtonText="Sí, Eliminar Todo"
-      confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
-      cancelButtonText="No, Cancelar"
-      cancelButtonClass="bg-gray-300 hover:bg-gray-400 text-gray-800"
-      on:confirm={handleConfirmClearAll}
-      on:cancel={handleCancelClearAll}
-    />
-  {/if}
+  <AddTransaction on:add={handleAddTransaction} class="w-full md:max-w-none" /> <button
+                on:click={handleRequestClearAll}
+                class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-semibold transition w-full md:max-w-none" >
+                Limpiar todas las transacciones
+            </button>
 
-  <section class="w-full max-w-md space-y-2">
-    <label for="categoria" class="font-semibold block"
-      >Filtrar por categoría (Gastos):</label
-    >
-    <select
-      id="categoria"
-      bind:value={categoriaSeleccionada}
-      class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-    >
-      <option value="Todas">Todas las categorías</option>
-      <option value="Alimentación">Alimentación</option>
-      <option value="Transporte">Transporte</option>
-      <option value="Entretenimiento">Entretenimiento</option>
-      <option value="Salud">Salud</option>
-      <option value="Educación">Educación</option>
-      <option value="Otros">Otros</option>
-    </select>
-  </section>
+</section>
 
-  <AddTransaction on:add={handleAddTransaction} />
+</section> {#if editingExpense}
+<EditTransactionModal
+  transaction={editingExpense}
+  categories={categories}
+  on:save={handleModalSave}
+  on:cancel={handleModalCancel}
+/>
+{/if}
 
-  <button
-    on:click={handleRequestClearAll}
-    class="bg-red-600 hover:bg-red-700 text-white py-1 px-4 rounded-lg mb-2"
-  >
-    Limpiar todas las transacciones
-  </button>
+{#if isConfirmDeleteOpen}
+<ConfirmModal
+  title="Confirmar Eliminación"
+  message={confirmDeleteMessage}
+  on:confirm={handleConfirmDelete}
+  on:cancel={handleCancelDelete}
+/>
+{/if}
+{#if isConfirmClearAllOpen}
+<ConfirmModal
+   title="Confirmar Limpiar Todo"
+   message={confirmClearAllMessage}
+   confirmButtonText="Sí, Eliminar Todo"
+   confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
+   cancelButtonText="No, Cancelar"
+   cancelButtonClass="bg-gray-300 hover:bg-gray-400 text-gray-800"
+  on:confirm={handleConfirmClearAll}
+  on:cancel={handleCancelClearAll}
+/>
+{/if}
 
-  <ul class="w-full max-w-md space-y-2">
-    {#each gastosFiltrados as transaction (transaction.id)}
-      <TransactionItem
-        {transaction}
-        on:requestDelete={handleRequestDelete}
-        on:edit={handleStartEditing}
-      />
-    {/each}
-  </ul>
+
+<ul class="w-full space-y-2 mt-6"> {#each gastosFiltrados as transaction (transaction.id)}
+<TransactionItem transaction={transaction} on:requestDelete={handleRequestDelete} on:edit={handleStartEditing} />
+{/each}
+</ul>
+
 </main>
