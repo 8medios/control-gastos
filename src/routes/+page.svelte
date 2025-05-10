@@ -1,26 +1,102 @@
 <script lang="ts">
   import AddTransaction from "$lib/components/AddTransaction.svelte";
   import TransactionItem from "$lib/components/TransactionItem.svelte";
-  // Importamos el nuevo componente del modal de edición
   import EditTransactionModal from "$lib/components/EditTransactionModal.svelte";
+  // Importamos el nuevo componente ConfirmModal
+  import ConfirmModal from "$lib/components/ConfirmModal.svelte";
   import type { Transaction, BudgetConfig } from "$lib/types";
   import { expenses } from "$lib/stores";
   import { budget } from "$lib/config";
 
   const handleAddTransaction = (e: CustomEvent<Transaction>) => {
+    /* ... sin cambios */
     expenses.update((list) => [e.detail, ...list]);
   };
 
-  const handleDeleteExpense = (e: CustomEvent<string>) => {
-    const idToDelete = e.detail;
-    expenses.update((list) => {
-      return list.filter((transaction) => transaction.id !== idToDelete);
-    });
+  // La función handleDeleteExpense original ya no se llama directamente desde TransactionItem.
+  // Se llamará LUEGO de confirmar en el modal.
+  //   const handleDeleteExpense = (e: CustomEvent<string>) => {
+  //   const idToDelete = e.detail;
+  //   expenses.update((list) => {
+  //     return list.filter((transaction) => transaction.id !== idToDelete);
+  //   });
+  // };
+
+  // ** Lógica para Modales de Confirmación **
+
+  // Estado para el modal de eliminar transacción individual
+  let isConfirmDeleteOpen = false;
+  let transactionToDeleteId: string | null = null;
+  let confirmDeleteMessage = "";
+
+  // Estado para el modal de limpiar todas las transacciones
+  let isConfirmClearAllOpen = false;
+  let confirmClearAllMessage =
+    "¿Estás seguro de que quieres eliminar TODAS las transacciones? Esta acción no se puede deshacer.";
+
+  // Función llamada por TransactionItem cuando quiere ser eliminado
+  const handleRequestDelete = (e: CustomEvent<string>) => {
+    const id = e.detail;
+    const transaction = $expenses.find((item) => item.id === id); // Encontrar la transacción para el mensaje
+
+    if (transaction) {
+      transactionToDeleteId = id; // Guardar el ID del que se va a borrar
+      confirmDeleteMessage = `¿Estás seguro de que quieres eliminar la transacción "${transaction.name}" (${transaction.type === "expense" ? "-" : "+"}${transaction.amount.toFixed(2)})?`;
+      isConfirmDeleteOpen = true; // Mostrar el modal de confirmación individual
+    }
+    // Si no se encuentra la transacción, simplemente no hacemos nada (o mostramos un error)
   };
 
+  // Función llamada por el modal de eliminación individual cuando se CONFIRMA
+  const handleConfirmDelete = () => {
+    if (transactionToDeleteId) {
+      // Ejecutamos la lógica de eliminación (movida desde handleDeleteExpense original)
+      expenses.update((list) => {
+        return list.filter(
+          (transaction) => transaction.id !== transactionToDeleteId
+        );
+      });
+    }
+    // Cerramos el modal y reseteamos el estado
+    isConfirmDeleteOpen = false;
+    transactionToDeleteId = null;
+    confirmDeleteMessage = ""; // Limpiar mensaje por si acaso
+  };
+
+  // Función llamada por el modal de eliminación individual cuando se CANCELA
+  const handleCancelDelete = () => {
+    // Cerramos el modal y reseteamos el estado
+    isConfirmDeleteOpen = false;
+    transactionToDeleteId = null;
+    confirmDeleteMessage = "";
+  };
+
+  // Función llamada por el botón "Limpiar todas las transacciones"
+  const handleRequestClearAll = () => {
+    // Mostramos el modal de confirmación para limpiar todo
+    isConfirmClearAllOpen = true;
+  };
+
+  // Función llamada por el modal de limpiar todo cuando se CONFIRMA
+  const handleConfirmClearAll = () => {
+    // Ejecutamos la lógica de limpiar todo (movida desde clearExpenses original)
+    expenses.set([]);
+
+    // Cerramos el modal
+    isConfirmClearAllOpen = false;
+  };
+
+  // Función llamada por el modal de limpiar todo cuando se CANCELA
+  const handleCancelClearAll = () => {
+    // Cerramos el modal
+    isConfirmClearAllOpen = false;
+  };
+
+  // Lógica de edición (sin cambios en las funciones, solo en el manejo del modal)
   let editingExpense: Transaction | null = null;
 
   const handleStartEditing = (e: CustomEvent<string>) => {
+    /* ... sin cambios */
     const idToEdit = e.detail;
     const transactionToEdit = $expenses.find(
       (transaction) => transaction.id === idToEdit
@@ -33,8 +109,7 @@
       transactionToEdit.amount !== undefined &&
       transactionToEdit.type
     ) {
-      // Solo asignamos el gasto encontrado. El modal creará su propia copia.
-      editingExpense = transactionToEdit;
+      editingExpense = { ...transactionToEdit };
     } else {
       console.warn(
         "Intento de editar una transacción inválida o no encontrada:",
@@ -45,28 +120,23 @@
     }
   };
 
-  // ** Manejadores para los eventos del EditTransactionModal **
-
-  // Función llamada cuando el modal despacha 'save'
   const handleModalSave = (e: CustomEvent<Transaction>) => {
-    const updatedTransaction = e.detail; // El modal nos envía la transacción ya modificada
-
+    /* ... sin cambios */
+    const updatedTransaction = e.detail;
     expenses.update((list) => {
-      // Usamos map para reemplazar la transacción editada
       return list.map((transaction) => {
         if (transaction.id === updatedTransaction.id) {
-          return updatedTransaction; // Devuelve el objeto actualizado (Transaction)
+          return updatedTransaction;
         }
-        return transaction; // Devuelve la transacción original
+        return transaction;
       });
     });
-
-    editingExpense = null; // Oculta el modal
+    editingExpense = null;
   };
 
-  // Función llamada cuando el modal despacha 'cancel'
   const handleModalCancel = () => {
-    editingExpense = null; // Oculta el modal
+    /* ... sin cambios */
+    editingExpense = null;
   };
 
   // Cálculos basados en el periodo de presupuesto (sin cambios)
@@ -80,7 +150,6 @@
     }
     return acc;
   }, 0);
-
   // Calcular total de INGRESOS dentro del periodo
   $: totalIngresos = $expenses.reduce((acc, item) => {
     if (
@@ -204,7 +273,6 @@
     <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">
       Resumen del Periodo
     </h2>
-
     <div class="grid grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
       <p>
         <strong class="block text-sm">Presupuesto Inicial:</strong>
@@ -239,7 +307,6 @@
         >
       </p>
     </div>
-
     <div class="w-full mt-4">
       <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
         Gasto vs Fondos Disponibles ({porcentajeGastado.toFixed(1)}%)
@@ -274,6 +341,28 @@
     />
   {/if}
 
+  {#if isConfirmDeleteOpen}
+    <ConfirmModal
+      title="Confirmar Eliminación"
+      message={confirmDeleteMessage}
+      on:confirm={handleConfirmDelete}
+      on:cancel={handleCancelDelete}
+    />
+  {/if}
+
+  {#if isConfirmClearAllOpen}
+    <ConfirmModal
+      title="Confirmar Limpiar Todo"
+      message={confirmClearAllMessage}
+      confirmButtonText="Sí, Eliminar Todo"
+      confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
+      cancelButtonText="No, Cancelar"
+      cancelButtonClass="bg-gray-300 hover:bg-gray-400 text-gray-800"
+      on:confirm={handleConfirmClearAll}
+      on:cancel={handleCancelClearAll}
+    />
+  {/if}
+
   <section class="w-full max-w-md space-y-2">
     <label for="categoria" class="font-semibold block"
       >Filtrar por categoría (Gastos):</label
@@ -296,7 +385,7 @@
   <AddTransaction on:add={handleAddTransaction} />
 
   <button
-    on:click={clearExpenses}
+    on:click={handleRequestClearAll}
     class="bg-red-600 hover:bg-red-700 text-white py-1 px-4 rounded-lg mb-2"
   >
     Limpiar todas las transacciones
@@ -306,7 +395,7 @@
     {#each gastosFiltrados as transaction (transaction.id)}
       <TransactionItem
         {transaction}
-        on:delete={handleDeleteExpense}
+        on:requestDelete={handleRequestDelete}
         on:edit={handleStartEditing}
       />
     {/each}
