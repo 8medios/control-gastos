@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AddTransaction from '$lib/components/AddTransaction.svelte';
 	// Importamos el nuevo componente TransactionItem
-	import TransactionItem from '$lib/components/TransactionItem.svelte';
+	import TransactionItem from '$lib/components/TransactionItem.svelte'; // <--- Importación actualizada
 	import type { Transaction, BudgetConfig } from '$lib/types';
 	import { expenses } from '$lib/stores';
 	import { budget } from '$lib/config';
@@ -176,7 +176,7 @@
                 <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Editar Transacción</h2>
                 <form on:submit|preventDefault={handleUpdateExpense} class="space-y-4">
                     <div class="mb-4">
-                         <!-- svelte-ignore a11y_label_has_associated_control -->
+                      <!-- svelte-ignore a11y_label_has_associated_control -->
                          <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">Tipo</label>
                          <p class="text-lg font-semibold text-gray-800 dark:text-gray-200">
                              {editingExpense.type === 'expense' ? 'Gasto' : 'Ingreso'}
@@ -253,7 +253,8 @@
       <option value="Alimentación">Alimentación</option>
       <option value="Transporte">Transporte</option>
       <option value="Entretenimiento">Entretenimiento</option>
-      <option value="Salud">Salud</option>       <option value="Educación">Educación</option>
+      <option value="Salud">Salud</option>
+      <option value="Educación">Educación</option>
       <option value="Otros">Otros</option>
     </select>
   </section>
@@ -269,8 +270,7 @@
 
 	<ul class="w-full max-w-md space-y-2">
 		{#each gastosFiltrados as transaction (transaction.id)}
-			<TransactionItem expense={transaction} on:delete={handleDeleteExpense} on:edit={handleStartEditing} />
-		{/each}
+			<TransactionItem transaction={transaction} on:delete={handleDeleteExpense} on:edit={handleStartEditing} /> {/each}
 	</ul>
 
 </main>
