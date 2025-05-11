@@ -1,75 +1,86 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import { onMount } from "svelte"; // Útil si necesitas inicialización basada en el DOM o el tiempo
-  import type { Transaction } from "$lib/types"; // Props que recibe el modal: la transacción a editar y la lista de categorías
+  import { onMount } from "svelte";
+  import type { Transaction } from "$lib/types";
 
-  export let transaction: Transaction;
-  export let categories: string[]; // Recibe la lista de categorías
-  // Eventos que despacha el modal: para guardar o cancelar
+  export let transaction: Transaction; // Transacción a editar
+  export let categories: string[]; // Lista de categorías
 
-  const dispatch = createEventDispatcher<{ save: Transaction; cancel: void }>(); // ** Estado local del formulario de edición **
+  const dispatch = createEventDispatcher<{ save: Transaction; cancel: void }>();
 
-  // Creamos una copia local de la transacción recibida para vincular los inputs
-  // y evitar modificar la original antes de guardar.
-  // Usamos una declaración reactiva para actualizar la copia si la prop 'transaction' cambia (ej. editas otro item)
+  // Copia local de la transacción para editar
   let editedTransaction: Transaction = { ...transaction };
 
-  // ** Estado local para errores de validación **
+  // Estados locales para errores de validación por campo
   let nameError: string | null = null;
   let amountError: string | null = null;
-  let dateError: string | null = null; // Aunque el input type="date" valida algo, podemos añadir check
-  let categoryError: string | null = null; // Para gastos
+  let dateError: string | null = null;
+  let categoryError: string | null = null;
 
-  // Función de validación centralizada
-  function validateForm(): boolean {
-    // Resetear errores al inicio de la validación
-    nameError = null;
-    amountError = null;
-    dateError = null;
-    categoryError = null;
-
+  // Función de validación mejorada: puede validar un campo específico o todos
+  function validateField(fieldName: 'name' | 'amount' | 'date' | 'category' | 'all'): boolean {
     let isValid = true;
 
-    // Validación del nombre/descripción
-    if (!editedTransaction.name.trim()) {
-      nameError = "La descripción no puede estar vacía.";
-      isValid = false;
+    // Validar Nombre
+    if (fieldName === 'name' || fieldName === 'all') {
+      if (!editedTransaction.name.trim()) {
+        nameError = "La descripción no puede estar vacía.";
+        isValid = false;
+      } else {
+        nameError = null; // Limpiar error si es válido
+      }
     }
 
-    // Validación del monto
-    if (
-      editedTransaction.amount === null ||
-      editedTransaction.amount === undefined ||
-      editedTransaction.amount <= 0
-    ) {
-      amountError = "El monto debe ser un número positivo.";
-      isValid = false;
-    }
-    // Podrías añadir más validaciones para el monto si lo necesitas (ej. no es un número válido)
+    // Validar Monto
+    if (fieldName === 'amount' || fieldName === 'all') {
+      // Asegurarse de que editedTransaction.amount sea un número antes de validar
+      const numericAmount = typeof editedTransaction.amount === 'number' ? editedTransaction.amount : parseFloat(String(editedTransaction.amount));
 
-    // Validación de la fecha (básica, type="date" ya ayuda)
-    if (
-      !editedTransaction.date ||
-      !editedTransaction.date.match(/^\d{4}-\d{2}-\d{2}$/)
-    ) {
-      dateError = "Formato de fecha inválido."; // Aunque type="date" evita esto si el navegador lo soporta bien
-      isValid = false;
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        amountError = "El monto debe ser un número positivo.";
+        isValid = false;
+      } else {
+        amountError = null; // Limpiar error si es válido
+      }
     }
 
-    // Validación de categoría (solo para gastos)
-    if (editedTransaction.type === "expense" && !editedTransaction.category) {
-      categoryError = "Debes seleccionar una categoría para gastos.";
-      // Si 'Otros' siempre está seleccionado por defecto y tiene valor, quizás esta validación no es estrictamente necesaria si "Otros" es válido.
-      // Pero si permitieras una opción vacía, sería útil. Con el setup actual, 'Otros' siempre tiene valor, así que esta check es menos crítica.
-      // La dejo como ejemplo si cambias la lógica del select.
+    // Validar Fecha
+    if (fieldName === 'date' || fieldName === 'all') {
+       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+       if (!editedTransaction.date || !dateRegex.test(editedTransaction.date)) {
+           dateError = "Formato de fecha inválido (YYYY-MM-DD).";
+           isValid = false;
+       } else {
+           // Opcional: Validar si la fecha es una fecha válida
+           const [year, month, day] = editedTransaction.date.split('-').map(Number);
+           const d = new Date(year, month - 1, day);
+            if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+               dateError = "Fecha inválida.";
+               isValid = false;
+           } else {
+               dateError = null; // Limpiar error si es válido
+           }
+       }
     }
 
+    // Validar Categoría (solo para gastos)
+    if (fieldName === 'category' || fieldName === 'all') {
+      if (editedTransaction.type === "expense" && !editedTransaction.category) {
+        categoryError = "Debes seleccionar una categoría para gastos.";
+        isValid = false;
+      } else {
+        categoryError = null; // Limpiar error si es válido
+      }
+    }
+
+    // Cuando se valida 'all', el retorno indica si TODOS los campos son válidos
     return isValid;
-  } // Handler para guardar cambios
+  }
 
+  // Handler para guardar cambios
   const handleSubmit = () => {
-    // Ejecutar validación antes de despachar
-    if (!validateForm()) {
+    // Validar todos los campos antes de despachar
+    if (!validateField('all')) {
       console.warn("Errores de validación. No se guardaron los cambios.");
       return; // Detiene el envío si la validación falla
     }
@@ -80,11 +91,10 @@
 
   // Handler para cancelar edición
   const handleCancelClick = () => {
-    // Opcional: Añadir confirmación si hay cambios sin guardar (más avanzado)
     dispatch("cancel"); // Despachamos evento 'cancel'
   };
 
-  // Manejar el cierre del modal al presionar Escape (mejor UX)
+  // Manejar el cierre del modal al presionar Escape
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === "Escape") {
       handleCancelClick();
@@ -94,21 +104,47 @@
   // Asegurar que el modal captura eventos de teclado al montarse y limpia al desmontarse
   onMount(() => {
     window.addEventListener("keydown", handleKeydown);
+    // Validar todos los campos al abrir el modal inicialmente
+    validateField('all');
     return () => {
       // Limpiar el listener al desmontar
       window.removeEventListener("keydown", handleKeydown);
     };
   });
 
-  // Asegurar que editedTransaction se reinicializa si la prop 'transaction' cambia (ej. editas un item, luego otro)
+  // Asegurar que editedTransaction se reinicializa si la prop 'transaction' cambia
+  // y re-validar los campos para la nueva transacción
   $: if (transaction) {
     editedTransaction = { ...transaction };
-    // Opcional: Resetear errores también al cambiar de transacción editada
-    nameError = null;
-    amountError = null;
-    dateError = null;
-    categoryError = null;
+    // Validar todos los campos para la nueva transacción al cambiar
+    validateField('all');
   }
+
+   // --- Handlers para validación instantánea (on:blur) ---
+  const handleNameBlur = () => validateField('name');
+  const handleAmountBlur = () => validateField('amount');
+  const handleDateBlur = () => validateField('date');
+  const handleCategoryBlur = () => validateField('category');
+
+  // --- Opcional: Validar mientras se escribe (on:input) ---
+  // Puedes añadir validaciones más ligeras aquí si no son costosas
+   const handleNameInput = () => {
+       if (nameError) validateField('name'); // Solo re-validar si ya había un error
+   };
+    const handleAmountInput = () => {
+        if (amountError) validateField('amount'); // Solo re-validar si ya había un error
+    };
+    const handleDateInput = () => {
+         if (dateError) validateField('date'); // Solo re-validar si ya había un error
+    };
+
+    // Reactive statement to clear category error if type changes (though type is not editable here)
+    // Kept for consistency if type editing were added later
+    // $: if (editedTransaction.type === 'income') {
+    //     categoryError = null;
+    // }
+
+
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -146,10 +182,8 @@
           id="edit-name"
           bind:value={editedTransaction.name}
           type="text"
-          class="w-full p-2 rounded border {nameError
-            ? 'border-red-500'
-            : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
-        />
+          class="w-full p-2 rounded border {nameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
+          on:blur={handleNameBlur}   on:input={handleNameInput} />
         {#if nameError}
           <p class="text-red-500 text-xs mt-1">{nameError}</p>
         {/if}
@@ -167,10 +201,8 @@
           type="number"
           min="0"
           step="0.01"
-          class="w-full p-2 rounded border {amountError
-            ? 'border-red-500'
-            : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
-        />
+          class="w-full p-2 rounded border {amountError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
+          on:blur={handleAmountBlur}   on:input={handleAmountInput} />
         {#if amountError}
           <p class="text-red-500 text-xs mt-1">{amountError}</p>
         {/if}
@@ -186,10 +218,8 @@
           id="edit-date"
           bind:value={editedTransaction.date}
           type="date"
-          class="w-full p-2 rounded border {dateError
-            ? 'border-red-500'
-            : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
-        />
+          class="w-full p-2 rounded border {dateError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
+          on:blur={handleDateBlur}   on:input={handleDateInput} />
         {#if dateError}
           <p class="text-red-500 text-xs mt-1">{dateError}</p>
         {/if}
@@ -205,14 +235,12 @@
           <select
             id="edit-category"
             bind:value={editedTransaction.category}
-            class="w-full p-2 rounded border {categoryError
-              ? 'border-red-500'
-              : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
-          >
+            class="w-full p-2 rounded border {categoryError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
+             on:blur={handleCategoryBlur} on:input={handleCategoryBlur} >
             {#each categories as cat}
               <option value={cat}>{cat}</option>
             {/each}
-            {#if editedTransaction.category === undefined}
+             {#if editedTransaction.category === undefined}
               <option value="Otros" selected>Otros</option>
             {/if}
           </select>
