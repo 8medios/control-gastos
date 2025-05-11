@@ -1,5 +1,4 @@
 <script lang="ts">
-	// ... (código del script sin cambios) ...
 	import AddTransaction from "$lib/components/AddTransaction.svelte";
 	import TransactionItem from "$lib/components/TransactionItem.svelte";
 	import EditTransactionModal from "$lib/components/EditTransactionModal.svelte";
@@ -14,19 +13,17 @@
     import { browser } from '$app/environment'; // Importar 'browser' para verificar si estamos en el navegador
 
 	const handleAddTransaction = (e: CustomEvent<Transaction>) => {
-		/* ... sin cambios */
 		expenses.update((list) => [e.detail, ...list]);
 	};
 
 	const handleDeleteExpense = (e: CustomEvent<string>) => {
-		/* ... sin cambios */
 		const idToDelete = e.detail;
 		expenses.update((list) => {
 			return list.filter((transaction) => transaction.id !== idToDelete);
 		});
 	};
 
-	// Lógica de modales de confirmación (sin cambios)
+	// Lógica de modales de confirmación
 	let isConfirmDeleteOpen = false;
 	let transactionToDeleteId: string | null = null;
 	let confirmDeleteMessage = "";
@@ -56,30 +53,25 @@
 		confirmDeleteMessage = "";
 	};
 	const handleCancelDelete = () => {
-		/* ... sin cambios */
 		isConfirmDeleteOpen = false;
 		transactionToDeleteId = null;
 		confirmDeleteMessage = "";
 	};
 
 	const handleRequestClearAll = () => {
-		/* ... sin cambios */
 		isConfirmClearAllOpen = true;
 	};
 	const handleConfirmClearAll = () => {
-		/* ... sin cambios */
 		expenses.set([]);
 		isConfirmClearAllOpen = false;
 	};
 	const handleCancelClearAll = () => {
-		/* ... sin cambios */
 		isConfirmClearAllOpen = false;
 	};
 
-	// Lógica de edición (sin cambios)
+	// Lógica de edición
 	let editingExpense: Transaction | null = null;
 	const handleStartEditing = (e: CustomEvent<string>) => {
-		/* ... sin cambios */
 		const idToEdit = e.detail;
 		const transactionToEdit = $expenses.find(
 			(transaction) => transaction.id === idToEdit
@@ -102,7 +94,6 @@
 		}
 	};
 	const handleModalSave = (e: CustomEvent<Transaction>) => {
-		/* ... sin cambios */
 		const updatedTransaction = e.detail;
 		expenses.update((list) => {
 			return list.map((transaction) => {
@@ -115,12 +106,11 @@
 		editingExpense = null;
 	};
 	const handleModalCancel = () => {
-		/* ... sin cambios */
 		editingExpense = null;
 	};
 
 
-	// Cálculos basados en el periodo de presupuesto (sin cambios)
+	// Cálculos basados en el periodo de presupuesto
 	$: totalGastos = $expenses.reduce((acc, item) => {
 		if (
 			item.type === "expense" &&
@@ -142,7 +132,7 @@
 		return acc;
 	}, 0);
 
-	// Función auxiliar para obtener la fecha de fin del periodo (sin cambios)
+	// Función auxiliar para obtener la fecha de fin del periodo
 	function getPeriodEndDate(startDateString: string): string {
 		const start = new Date(startDateString);
 		const endOfPeriod = new Date(
@@ -156,7 +146,7 @@
 		return endDate;
 	}
 
-	// Función para obtener todas las fechas dentro de un rango (sin cambios)
+	// Función para obtener todas las fechas dentro de un rango
 	function getDatesInRange(
 		startDateString: string,
 		endDateString: string
@@ -225,7 +215,6 @@
 	let categoriaSeleccionada: string = "Todas";
 
 	$: gastosFiltrados = $expenses.filter((transaction) => {
-		/* ... sin cambios */
 		const isExpense = transaction.type === "expense";
 		const matchesCategory =
 			categoriaSeleccionada === "Todas" ||
@@ -254,9 +243,7 @@
 			? "bg-yellow-500"
 			: "bg-red-500";
 
-	// ** DATOS Y OPCIONES PARA LOS GRÁFICOS (sin cambios en lógica de datos/opciones) **
-
-	// Store simple para detectar el modo oscuro desde el body class
+	// ** DATOS Y OPCIONES PARA LOS GRÁFICOS **
 	import { readable } from "svelte/store";
 
 	const isDarkMode = readable(false, (set) => {
@@ -272,7 +259,7 @@
 		return () => observer.disconnect();
 	});
 
-	// --- Datos para el GRÁFICO DE BARRAS (Gastos/Ingresos Diarios) - sin cambios ---
+	// --- Datos para el GRÁFICO DE BARRAS (Gastos/Ingresos Diarios) ---
 	$: periodStartDate = $budget.startDate;
 	$: periodEndDate = getPeriodEndDate(periodStartDate);
 	$: chartLabels = getDatesInRange(periodStartDate, periodEndDate);
@@ -368,7 +355,7 @@
 		},
 	};
 
-	// --- Datos para el GRÁFICO DE TARTA (Gastos por Categoría) - sin cambios ---
+	// --- Datos para el GRÁFICO DE TARTA (Gastos por Categoría) ---
 	$: periodExpenses = $expenses.filter(t => t.type === 'expense' && t.date >= periodStartDate && t.date <= periodEndDate);
 	$: categoryTotals = periodExpenses.reduce((acc, transaction) => { /* ... */ const category = transaction.category || 'Otros'; if (!acc[category]) { acc[category] = 0; } acc[category] += transaction.amount; return acc; }, {} as Record<string, number>);
 	$: pieChartLabels = Object.keys(categoryTotals);
@@ -378,7 +365,7 @@
 	$: pieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Distribución de Gastos por Categoría', color: $isDarkMode ? '#E5E7EB' : '#1F2937', }, legend: { display: true, position: 'top' as const, labels: { color: $isDarkMode ? '#D1D5DB' : '#4B5563', } }, tooltip: { backgroundColor: $isDarkMode ? 'rgba(229, 231, 235, 0.9)' : 'rgba(31, 41, 55, 0.9)', titleColor: $isDarkMode ? '#1F2937' : '#E5E7EB', bodyColor: $isDarkMode ? '#1F2937' : '#E5E7EB', borderColor: $isDarkMode ? '#4B5563' : '#D1D5DB', borderWidth: 1, cornerRadius: 4, callbacks: { label: function(context: any) { const label = context.label || ''; const value = context.raw || 0; const total = context.chart.data.datasets[0].data.reduce((sum: number, val: number) => sum + val, 0); const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0; return `${label}: $${value.toFixed(2)} (${percentage}%)`; } } } } };
 
 
-	// ** Lógica de Chart.js vanilla (Adaptada para 2 gráficos) - sin cambios **
+	// ** Lógica de Chart.js vanilla (Adaptada para 2 gráficos) **
 	let barCanvasElement: HTMLCanvasElement; // Canvas para el gráfico de barras
 	let pieCanvasElement: HTMLCanvasElement; // Canvas para el gráfico de tarta
 
@@ -434,6 +421,72 @@
 		}
 	};
 
+
+	// ** FUNCIÓN: Exportar Transacciones a CSV (Con BOM y Punto y Coma como Delimitador, ID Secuencial) **
+	const exportTransactionsAsCsv = () => {
+		if (!browser) return; // Solo ejecutar en el navegador
+
+		const data = $expenses; // Obtener los datos de la store
+
+		if (data.length === 0) {
+			alert("No hay transacciones para exportar.");
+			return;
+		}
+
+		// Definir el encabezado CSV usando PUNTO Y COMA como delimitador
+		// Se elimina la columna ID ya que usaremos un índice secuencial
+		const header = "Número;Nombre;Monto;Tipo;Fecha;Categoría\n"; // MODIFICADO: Encabezado sin ID, usando 'Número'
+
+		// Formatear los datos
+		const csvRows = data.map((transaction, index) => { // MODIFICADO: Añadido 'index'
+			// Función auxiliar para escapar delimitadores y dobles comillas en campos
+			const escapeCsvField = (field: any) => {
+                if (field === null || field === undefined) return '';
+                const stringField = String(field);
+				// Escapar campos si contienen el delimitador (punto y coma), comillas dobles o salto de línea
+				if (stringField.includes(';') || stringField.includes('"') || stringField.includes('\n')) { // Escapando ';'
+					// Si el campo contiene punto y coma, comillas dobles o salto de línea, enciérralo entre comillas dobles
+					// y escapa cualquier comilla doble dentro duplicándola.
+					return `"${stringField.replace(/"/g, '""')}"`;
+				}
+				return stringField;
+			};
+
+			// Formatear el monto: añadir signo y reemplazar punto decimal por coma
+			const formattedAmount = `${transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2).replace('.', ',')}`;
+
+			return [
+				escapeCsvField(index + 1), // MODIFICADO: Usar número secuencial (empezando en 1)
+				escapeCsvField(transaction.name),
+				escapeCsvField(formattedAmount), // Usar el monto formateado con signo y coma decimal
+				escapeCsvField(transaction.type),
+				escapeCsvField(transaction.date),
+				escapeCsvField(transaction.category || 'Sin categoría') // Manejar categoría opcional
+			].join(';'); // Unir campos con PUNTO Y COMA
+		}).join('\n'); // Unir filas con salto de línea
+
+		// Combinar encabezado y filas de datos, AÑADIENDO EL BOM UTF-8 al inicio
+		const csvString = '\ufeff' + header + csvRows; // Mantenemos '\ufeff' para codificación
+
+		// Crear un Blob
+		const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' }); // Mantenemos type
+
+		// Crear un enlace temporal para descargar el archivo
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `transacciones-${new Date().toISOString().slice(0,10)}.csv`; // Nombre del archivo
+
+		// Disparar la descarga
+		a.click();
+
+		// Liberar la URL del Blob después de un pequeño retraso
+		setTimeout(() => {
+			URL.revokeObjectURL(url);
+		}, 0);
+	};
+
+
 </script>
 
 <main class="p-4 flex flex-col gap-4 mx-auto w-full lg:max-w-screen-xl xl:max-w-screen-2xl">
@@ -445,7 +498,7 @@
 			<section
 				class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 space-y-4"
 			>
-				<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">
+				<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
 					Resumen del Periodo
 				</h2>
 				<div class="grid grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
@@ -554,7 +607,7 @@
 		<div class="w-full md:w-1/2 flex flex-col gap-6">
 
 			<section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 space-y-2">
-				 <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">
+				 <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                     Nueva Transacción
                  </h2>
 				<AddTransaction on:add={handleAddTransaction} class="w-full" />
@@ -567,12 +620,12 @@
                 > Ver Gráficos
                 </button>
                 <a
-                    href="/configuracion"
+                    href="/configuration"
                     class="block text-center w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
                 > Ir a Configuración
                 </a>
                  <button
-                    on:click={() => alert('Funcionalidad de exportar pendiente')} 
+                    on:click={exportTransactionsAsCsv} 
                     class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
                  > Exportar Datos
                  </button>
@@ -614,7 +667,8 @@
 
 	</section>
 
-	{#if editingExpense} <EditTransactionModal transaction={editingExpense} {categories} on:save={handleModalSave} on:cancel={handleModalCancel} /> {/if} {#if isConfirmDeleteOpen} <ConfirmModal title="Confirmar Eliminación" message={confirmDeleteMessage} on:confirm={handleConfirmDelete} on:cancel={handleCancelDelete} /> {/if}
+	{#if editingExpense} <EditTransactionModal transaction={editingExpense} {categories} on:save={handleModalSave} on:cancel={handleModalCancel} /> {/if}
+	{#if isConfirmDeleteOpen} <ConfirmModal title="Confirmar Eliminación" message={confirmDeleteMessage} on:confirm={handleConfirmDelete} on:cancel={handleCancelDelete} /> {/if}
 	{#if isConfirmClearAllOpen} <ConfirmModal title="Confirmar Limpiar Todo" message={confirmClearAllMessage} confirmButtonText="Sí, Eliminar Todo" confirmButtonClass="bg-red-600 hover:bg-red-700 text-white" cancelButtonText="No, Cancelar" cancelButtonClass="bg-gray-300 hover:bg-gray-400 text-gray-800" on:confirm={handleConfirmClearAll} on:cancel={handleCancelClearAll} /> {/if}
 
 </main>
