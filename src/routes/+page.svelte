@@ -251,7 +251,7 @@
 			? "bg-yellow-500"
 			: "bg-red-500";
 
-	// ** DATOS Y OPCIONES PARA EL GRÁFICO (Adaptados a vanilla) **
+	// ** DATOS Y OPCIONES PARA EL GRÁFICO (sin cambios) **
 
 	// Store simple para detectar el modo oscuro desde el body class
 	import { browser } from "$app/environment";
@@ -273,70 +273,38 @@
 	// Datos crudos y procesados
 	$: periodStartDate = $budget.startDate;
 	$: periodEndDate = getPeriodEndDate(periodStartDate);
-
-    // --- DEBUGGING LOGS ---
-    $: console.log("--- Chart Debug ---");
-    $: console.log("$expenses:", $expenses);
-    $: console.log("Budget Start/End Date:", periodStartDate, periodEndDate);
-    // --- END DEBUGGING LOGS ---
-
-
 	$: chartLabels = getDatesInRange(periodStartDate, periodEndDate);
-
-    // --- DEBUGGING LOGS ---
-    $: console.log("Chart Labels (dates in period):", chartLabels);
-    // --- END DEBUGGING LOGS ---
-
-
 	$: dailyTotals = $expenses.reduce(
 		(acc, transaction) => {
-			// Solo consideramos transacciones dentro del rango de fechas del gráfico
 			if (
 				transaction.date >= periodStartDate &&
 				transaction.date <= periodEndDate
 			) {
-				// Inicializar el objeto para la fecha si no existe
 				if (!acc[transaction.date]) {
 					acc[transaction.date] = { expense: 0, income: 0 };
 				}
-				// Sumar el monto al tipo correspondiente
 				acc[transaction.date][transaction.type] += transaction.amount;
 			}
 			return acc;
 		},
 		{} as Record<string, { expense: number; income: number }>
 	);
-
-    // --- DEBUGGING LOGS ---
-    $: console.log("Daily Totals (aggregated data):", dailyTotals);
-    // --- END DEBUGGING LOGS ---
-
-
-	// Construir los datasets para Chart.js usando las fechas como base
 	$: chartDatasets = [
 		{
 			label: "Gastos Diarios",
-			backgroundColor: "rgba(239, 68, 68, 0.6)", // Tailwind red-500 con opacidad
+			backgroundColor: "rgba(239, 68, 68, 0.6)",
 			borderColor: "rgb(239, 68, 68)",
-			data: chartLabels.map((date) => dailyTotals[date]?.expense || 0), // Obtener el total de gasto para cada fecha (0 si no hay)
-			borderRadius: 4, // Barras redondeadas
+			data: chartLabels.map((date) => dailyTotals[date]?.expense || 0),
+			borderRadius: 4,
 		},
 		{
 			label: "Ingresos Diarios",
-			backgroundColor: "rgba(34, 197, 94, 0.6)", // Tailwind green-500 con opacidad
+			backgroundColor: "rgba(34, 197, 94, 0.6)",
 			borderColor: "rgb(34, 197, 94)",
-			data: chartLabels.map((date) => dailyTotals[date]?.income || 0), // Obtener el total de ingreso para cada fecha (0 si no hay)
-			borderRadius: 4, // Barras redondeadas
+			data: chartLabels.map((date) => dailyTotals[date]?.income || 0),
+			borderRadius: 4,
 		},
 	];
-
-     // --- DEBUGGING LOGS ---
-    $: console.log("Final Chart Datasets:", chartDatasets);
-    $: console.log("--- End Chart Debug ---");
-    // --- END DEBUGGING LOGS ---
-
-
-	// Opciones del gráfico (Adaptadas para vanilla y usando $isDarkMode)
 	$: chartOptions = {
 		responsive: true,
 		maintainAspectRatio: false,
@@ -344,13 +312,11 @@
 			title: {
 				display: true,
 				text: "Gastos e Ingresos Diarios",
-				// Usamos $isDarkMode directamente aquí
-				color: $isDarkMode ? "#E5E7EB" : "#1F2937", // Color del título según modo
+				color: $isDarkMode ? "#E5E7EB" : "#1F2937",
 			},
 			tooltip: {
 				mode: "index" as const,
 				intersect: false,
-				// Usamos $isDarkMode directamente aquí
 				backgroundColor: $isDarkMode
 					? "rgba(229, 231, 235, 0.9)"
 					: "rgba(31, 41, 55, 0.9)",
@@ -366,15 +332,12 @@
 				title: {
 					display: true,
 					text: "Fecha",
-					// Usamos $isDarkMode directamente aquí
 					color: $isDarkMode ? "#D1D5DB" : "#4B5563",
 				},
 				ticks: {
-					// Usamos $isDarkMode directamente aquí
 					color: $isDarkMode ? "#D1D5DB" : "#4B5563",
 				},
 				grid: {
-					// Usamos $isDarkMode directamente aquí
 					color: $isDarkMode
 						? "rgba(75, 85, 99, 0.3)"
 						: "rgba(209, 213, 219, 0.5)",
@@ -385,18 +348,15 @@
 				title: {
 					display: true,
 					text: "Monto ($)",
-					// Usamos $isDarkMode directamente aquí
 					color: $isDarkMode ? "#D1D5DB" : "#4B5563",
 				},
 				ticks: {
-					// Usamos $isDarkMode directamente aquí
 					color: $isDarkMode ? "#D1D5DB" : "#4B5563",
 					callback: function (value: string | number) {
 						return "$" + (value as number).toFixed(0);
 					},
 				},
 				grid: {
-					// Usamos $isDarkMode directamente aquí
 					color: $isDarkMode
 						? "rgba(75, 85, 99, 0.3)"
 						: "rgba(209, 213, 219, 0.5)",
@@ -430,23 +390,20 @@
 		myChart?.destroy();
 	});
 
-	// Bloque reactivo: Se ejecuta cuando chartLabels, chartDatasets u chartOptions cambian
 	$: {
 		if (myChart) {
-			// Actualizamos los datos y opciones del gráfico
 			myChart.data.labels = chartLabels;
 			myChart.data.datasets = chartDatasets;
-			myChart.options = chartOptions; // Actualizar opciones también
-			// Le decimos a Chart.js que actualice la visualización
+			myChart.options = chartOptions;
 			myChart.update();
 		}
 	}
 </script>
 
-<main class="p-4 flex flex-col gap-6 mx-auto w-full lg:max-w-screen-lg">
-	<section class="flex flex-col md:flex-row gap-6">
+<main class="p-4 flex flex-col gap-6 mx-auto w-full lg:max-w-screen-xl xl:max-w-screen-2xl">
+	<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 		<section
-			class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full md:w-1/2 md:max-w-none space-y-4"
+			class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full space-y-4 col-span-1"
 		>
 			<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">
 				Resumen del Periodo
@@ -513,7 +470,9 @@
 			</div>
 		</section>
 
-		<section class="w-full md:w-1/2 md:max-w-none flex flex-col gap-6">
+		<section
+			class="w-full flex flex-col gap-6 col-span-1"
+		>
 			<div class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 space-y-2">
 				<label for="categoria" class="font-semibold block"
 					>Filtrar por categoría (Gastos):</label
@@ -534,27 +493,27 @@
 			</div>
 			<AddTransaction
 				on:add={handleAddTransaction}
-				class="w-full md:max-w-none"
+				class="w-full"
 			/>
 			<button
 				on:click={handleRequestClearAll}
-				class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-semibold transition w-full md:max-w-none"
+				class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-semibold transition w-full"
 			>
 				Limpiar todas las transacciones
 			</button>
 		</section>
-	</section>
-	<section
-		class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full space-y-4 mt-6"
-	>
-		<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-			Visualización de Transacciones
-		</h2>
-		<div class="relative h-96">
-			<canvas bind:this={canvasElement}></canvas>
-		</div>
-	</section>
 
+		<section
+			class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full space-y-4 col-span-1"
+		>
+			<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+				Visualización de Transacciones
+			</h2>
+			<div class="relative h-96 w-full">
+				<canvas bind:this={canvasElement}></canvas>
+			</div>
+		</section>
+	</section>
 	{#if editingExpense}
 		<EditTransactionModal
 			transaction={editingExpense}
