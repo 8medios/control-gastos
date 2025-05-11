@@ -6,7 +6,11 @@ import type { Transaction } from './types';
 
 // Función para cargar y "migrar" datos antiguos si es necesario
 const loadTransactions = (): Transaction[] => {
-    if (!browser) return []; // No localStorage en SSR
+    // Verificar si localStorage está disponible antes de intentar acceder
+    if (!browser || typeof localStorage === 'undefined') {
+        console.warn("localStorage no está disponible.");
+        return []; // Retornar vacío si no está disponible
+    }
 
     const data = localStorage.getItem('expenses'); // La clave sigue siendo 'expenses' por compatibilidad
 
@@ -20,7 +24,7 @@ const loadTransactions = (): Transaction[] => {
         return parsed.map(item => {
             // Creamos un objeto base con las propiedades esperadas
             const transaction: Transaction = {
-                id: item.id || 'temp-' + Math.random(), // Asegurar un id
+                id: item.id || 'temp-' + Math.random().toString(36).substring(2, 15), // Asegurar un id único básico si falta
                 name: item.name || 'Sin descripción', // Asegurar nombre
                 amount: typeof item.amount === 'number' ? item.amount : 0, // Asegurar monto numérico
                 date: typeof item.date === 'string' && item.date.match(/^\d{4}-\d{2}-\d{2}$/) ? item.date : new Date().toISOString().slice(0, 10), // Asegurar formato de fecha ISO
@@ -33,7 +37,8 @@ const loadTransactions = (): Transaction[] => {
 
     } catch (e) {
         console.error("Error loading or parsing transactions from localStorage:", e);
-        // En caso de error grave de parseo, borrar datos corruptos y retornar vacío
+        // En caso de error grave de parseo, podrías notificar al usuario
+        // o decidir si borrar los datos corruptos. Por ahora, solo registramos el error.
         // localStorage.removeItem('expenses'); // Descomentar si quieres borrar datos corruptos
         return [];
     }
@@ -48,7 +53,20 @@ export const expenses = writable<Transaction[]>(initial); // El nombre del store
 
 if (browser) {
 	expenses.subscribe((val) => {
-		// Guardamos los datos actualizados (que ya tienen el campo type)
-		localStorage.setItem('expenses', JSON.stringify(val));
+        // Verificar si localStorage está disponible antes de intentar guardar
+        if (typeof localStorage === 'undefined') {
+            console.warn("localStorage no está disponible, no se pueden guardar los cambios.");
+            // Aquí podrías mostrar un mensaje al usuario
+            return;
+        }
+		try {
+            // Guardamos los datos actualizados (que ya tienen el campo type)
+			localStorage.setItem('expenses', JSON.stringify(val));
+		} catch (e) {
+            // Manejar errores al guardar (ej. cuota excedida)
+            console.error("Error saving transactions to localStorage:", e);
+            // Aquí podrías notificar al usuario que no se pudieron guardar los datos
+		}
 	});
 }
+
