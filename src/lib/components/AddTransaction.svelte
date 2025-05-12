@@ -2,6 +2,7 @@
   import { createEventDispatcher } from "svelte";
   import { v4 as uuid } from "uuid";
   import type { Transaction } from "$lib/types";
+  import { categories } from "$lib/stores"; // Importar el store de categorías
 
   const dispatch = createEventDispatcher<{ add: Transaction }>();
 
@@ -10,7 +11,9 @@
   let amount: number | "" = ""; // Usamos number | "" para permitir el campo vacío inicialmente
   let date = new Date().toISOString().slice(0, 10);
   let transactionType: "expense" | "income" = "expense";
-  let category: string = "Otros";
+  // Inicializar categoría con la primera del store o un valor por defecto si el store está vacío
+  let category: string = $categories.length > 0 ? $categories[0] : "Otros";
+
 
   // Estados locales para errores de validación por campo
   let nameError: string | null = null;
@@ -18,15 +21,6 @@
   let dateError: string | null = null;
   let categoryError: string | null = null;
 
-  // Lista de categorías (podríamos moverla a un store más adelante)
-  const categories = [
-    "Alimentación",
-    "Transporte",
-    "Entretenimiento",
-    "Salud",
-    "Educación",
-    "Otros",
-  ];
 
   // Función de validación mejorada: puede validar un campo específico o todos
   function validateField(fieldName: 'name' | 'amount' | 'date' | 'category' | 'all'): boolean {
@@ -116,7 +110,7 @@
     amount = "";
     date = new Date().toISOString().slice(0, 10);
     transactionType = "expense";
-    category = "Otros";
+    category = $categories.length > 0 ? $categories[0] : "Otros"; // Resetear a la primera categoría o valor por defecto
 
     nameError = null;
     amountError = null;
@@ -144,10 +138,13 @@
    };
 
 
-   // Reactive statement to clear category error if type changes to income
+   // Declaración reactiva para limpiar el error de categoría si el tipo cambia a ingreso
    $: if (transactionType === 'income') {
        categoryError = null;
    }
+
+   // Declaración reactiva para actualizar la categoría por defecto si el store de categorías cambia
+   $: category = $categories.includes(category) ? category : ($categories.length > 0 ? $categories[0] : "Otros");
 
 
 </script>
@@ -256,9 +253,8 @@
             bind:value={category}
             class="w-full p-2 rounded border {categoryError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} dark:bg-gray-700 dark:text-white"
              on:blur={handleCategoryBlur} on:input={handleCategoryBlur} >
-            {#each categories as cat}
-              <option value={cat}>{cat}</option>
-            {/each}
+             {#each $categories as cat} <option value={cat}>{cat}</option>
+             {/each}
           </select>
           {#if categoryError}
             <p class="text-red-500 text-xs mt-1">{categoryError}</p>
@@ -274,4 +270,3 @@
       </button>
   </form>
 </div>
-

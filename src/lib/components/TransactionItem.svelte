@@ -2,15 +2,16 @@
   import { createEventDispatcher } from "svelte";
   import type { Transaction } from "$lib/types";
 
-  export let transaction: Transaction; // Dispatcher ahora emite 'requestDelete' en lugar de 'delete'
+  export let transaction: Transaction; // Transacción a mostrar
 
+  // Dispatcher ahora emite 'requestDelete' y 'edit'
   const dispatch = createEventDispatcher<{
     requestDelete: string;
     edit: string;
-  }>(); // <--- Evento actualizado
+  }>();
 
+  // Función para obtener el icono de la categoría
   function icono(cat?: string): string {
-    /* ... sin cambios */
     const mapa: Record<string, string> = {
       Alimentación: "🍔",
       Transporte: "🚌",
@@ -19,28 +20,31 @@
       Educación: "📚",
       Otros: "🧾",
     };
+    // Si la categoría existe en el mapa, usar su icono, de lo contrario usar el icono de 'Otros'
     const categoriaNormalizada = cat && mapa[cat] ? cat : "Otros";
     return mapa[categoriaNormalizada];
   }
 
   // Handler para el botón de eliminar - Pide confirmación al padre
   const handleDeleteClick = () => {
-    // Dispara el evento 'requestDelete' pasando el id del gasto
-    dispatch("requestDelete", transaction.id); // <--- Evento disparado actualizado
+    // Dispara el evento 'requestDelete' pasando el id de la transacción
+    dispatch("requestDelete", transaction.id);
   };
 
+  // Handler para el botón de editar
   const handleEditClick = () => {
-    /* ... sin cambios */
+    // Dispara el evento 'edit' pasando el id de la transacción
     dispatch("edit", transaction.id);
   };
 
-  // Lógica de visualización (sin cambios)
+  // Lógica de visualización reactiva
   $: isIncome = transaction.type === "income";
   $: amountColor = isIncome
     ? "text-green-600 dark:text-green-400"
     : "text-red-600 dark:text-red-400";
   $: amountPrefix = isIncome ? "+" : "-";
-  $: showIcon = !isIncome && transaction.category;
+  $: showIcon = !isIncome && transaction.category; // Mostrar icono solo para gastos con categoría
+
 </script>
 
 <li

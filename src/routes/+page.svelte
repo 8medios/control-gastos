@@ -4,8 +4,7 @@
 	import EditTransactionModal from "$lib/components/EditTransactionModal.svelte";
 	import ConfirmModal from "$lib/components/ConfirmModal.svelte";
 	import type { Transaction, BudgetConfig } from "$lib/types";
-	import { expenses } from "$lib/stores";
-	import { budget } from "$lib/config";
+	import { expenses, budget, categories } from "$lib/stores"; // Importar los stores necesarios
 
 	// Importar Chart.js directamente
 	import Chart from "chart.js/auto"; // Importa Chart.js (usa 'auto' para registrar controladores básicos)
@@ -70,29 +69,16 @@
 	};
 
 	// Lógica de edición
-	let editingExpense: Transaction | null = null;
+	// Ahora almacenamos solo el ID de la transacción que se está editando
+	let editingExpenseId: string | null = null;
+
 	const handleStartEditing = (e: CustomEvent<string>) => {
 		const idToEdit = e.detail;
-		const transactionToEdit = $expenses.find(
-			(transaction) => transaction.id === idToEdit
-		);
-		if (
-			transactionToEdit &&
-			transactionToEdit.id &&
-			transactionToEdit.name !== undefined &&
-			transactionToEdit.amount !== undefined &&
-			transactionToEdit.type
-		) {
-			editingExpense = { ...transactionToEdit };
-		} else {
-			console.warn(
-				"Intento de editar una transacción inválida o no encontrada:",
-				idToEdit,
-				transactionToEdit
-			);
-			editingExpense = null;
-		}
+		// Simplemente establecemos el ID de la transacción a editar.
+		// El modal se encargará de encontrar la transacción por este ID.
+		editingExpenseId = idToEdit;
 	};
+
 	const handleModalSave = (e: CustomEvent<Transaction>) => {
 		const updatedTransaction = e.detail;
 		expenses.update((list) => {
@@ -103,10 +89,13 @@
 				return transaction;
 			});
 		});
-		editingExpense = null;
+		// Después de guardar, cerramos el modal estableciendo editingExpenseId a null
+		editingExpenseId = null;
 	};
+
 	const handleModalCancel = () => {
-		editingExpense = null;
+		// Al cancelar, simplemente cerramos el modal estableciendo editingExpenseId a null
+		editingExpenseId = null;
 	};
 
 
@@ -222,14 +211,7 @@
 		return (isExpense && matchesCategory) || transaction.type === "income";
 	});
 
-	const categories = [
-		"Alimentación",
-		"Transporte",
-		"Entretenimiento",
-		"Salud",
-		"Educación",
-		"Otros",
-	];
+	// Las categorías ahora vienen del store importado
 
 	$: totalFondosDisponibles = $budget.amount + totalIngresos;
 	$: porcentajeGastado =
@@ -243,7 +225,7 @@
 			? "bg-yellow-500"
 			: "bg-red-500";
 
-	// ** DATOS Y OPCIONES PARA LOS GRÁFICOS **
+	// ** Datos y Opciones para los Gráficos **
 	import { readable } from "svelte/store";
 
 	const isDarkMode = readable(false, (set) => {
@@ -259,7 +241,7 @@
 		return () => observer.disconnect();
 	});
 
-	// --- Datos para el GRÁFICO DE BARRAS (Gastos/Ingresos Diarios) ---
+	// --- Datos para el Gráfico de Barras (Gastos/Ingresos Diarios) ---
 	$: periodStartDate = $budget.startDate;
 	$: periodEndDate = getPeriodEndDate(periodStartDate);
 	$: chartLabels = getDatesInRange(periodStartDate, periodEndDate);
@@ -355,7 +337,7 @@
 		},
 	};
 
-	// --- Datos para el GRÁFICO DE TARTA (Gastos por Categoría) ---
+	// --- Datos para el Gráfico de Tarta (Gastos por Categoría) ---
 	$: periodExpenses = $expenses.filter(t => t.type === 'expense' && t.date >= periodStartDate && t.date <= periodEndDate);
 	$: categoryTotals = periodExpenses.reduce((acc, transaction) => { /* ... */ const category = transaction.category || 'Otros'; if (!acc[category]) { acc[category] = 0; } acc[category] += transaction.amount; return acc; }, {} as Record<string, number>);
 	$: pieChartLabels = Object.keys(categoryTotals);
@@ -376,14 +358,14 @@
 	onMount(() => {
 		if (!browser) return; // Asegurarse de estar en el navegador
 
-		// Crear GRÁFICO DE BARRAS
+		// Crear Gráfico de Barras
 		const barCtx = barCanvasElement.getContext("2d");
-		if (!barCtx) { console.error("Could not get bar canvas context"); return; }
+		if (!barCtx) { console.error("No se pudo obtener el contexto del canvas para el gráfico de barras"); return; }
 		myBarChart = new Chart(barCtx, { type: "bar", data: { labels: chartLabels, datasets: barChartDatasets, }, options: barChartOptions, });
 
-		// Crear GRÁFICO DE TARTA
+		// Crear Gráfico de Tarta
 		const pieCtx = pieCanvasElement.getContext("2d");
-		if (!pieCtx) { console.error("Could not get pie canvas context"); return; }
+		if (!pieCtx) { console.error("No se pudo obtener el contexto del canvas para el gráfico de tarta"); return; }
 		myPieChart = new Chart(pieCtx, { type: "pie", data: { labels: pieChartLabels, datasets: pieChartDatasets }, options: pieChartOptions, });
 	});
 
@@ -435,10 +417,10 @@
 
 		// Definir el encabezado CSV usando PUNTO Y COMA como delimitador
 		// Se elimina la columna ID ya que usaremos un índice secuencial
-		const header = "Número;Nombre;Monto;Tipo;Fecha;Categoría\n"; // MODIFICADO: Encabezado sin ID, usando 'Número'
+		const header = "Número;Nombre;Monto;Tipo;Fecha;Categoría\n"; // Encabezado sin ID, usando 'Número'
 
 		// Formatear los datos
-		const csvRows = data.map((transaction, index) => { // MODIFICADO: Añadido 'index'
+		const csvRows = data.map((transaction, index) => { // Añadido 'index'
 			// Función auxiliar para escapar delimitadores y dobles comillas en campos
 			const escapeCsvField = (field: any) => {
                 if (field === null || field === undefined) return '';
@@ -456,7 +438,7 @@
 			const formattedAmount = `${transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2).replace('.', ',')}`;
 
 			return [
-				escapeCsvField(index + 1), // MODIFICADO: Usar número secuencial (empezando en 1)
+				escapeCsvField(index + 1), // Usar número secuencial (empezando en 1)
 				escapeCsvField(transaction.name),
 				escapeCsvField(formattedAmount), // Usar el monto formateado con signo y coma decimal
 				escapeCsvField(transaction.type),
@@ -581,12 +563,8 @@
 						class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 					>
 						<option value="Todas">Todas las categorías</option>
-						<option value="Alimentación">Alimentación</option>
-						<option value="Transporte">Transporte</option>
-						<option value="Entretenimiento">Entretenimiento</option>
-						<option value="Salud">Salud</option>
-						<option value="Educación">Educación</option>
-						<option value="Otros">Otros</option>
+						{#each $categories as cat} <option value={cat}>{cat}</option>
+						{/each}
 					</select>
                     <ul class="w-full space-y-2">
                         {#each gastosFiltrados as transaction (transaction.id)}
@@ -625,7 +603,7 @@
                 > Ir a Configuración
                 </a>
                  <button
-                    on:click={exportTransactionsAsCsv} 
+                    on:click={exportTransactionsAsCsv}
                     class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
                  > Exportar Datos
                  </button>
@@ -667,7 +645,8 @@
 
 	</section>
 
-	{#if editingExpense} <EditTransactionModal transaction={editingExpense} {categories} on:save={handleModalSave} on:cancel={handleModalCancel} /> {/if}
+	{#if editingExpenseId !== null} <EditTransactionModal editingExpenseId={editingExpenseId} on:save={handleModalSave} on:cancel={handleModalCancel} />
+	{/if}
 	{#if isConfirmDeleteOpen} <ConfirmModal title="Confirmar Eliminación" message={confirmDeleteMessage} on:confirm={handleConfirmDelete} on:cancel={handleCancelDelete} /> {/if}
 	{#if isConfirmClearAllOpen} <ConfirmModal title="Confirmar Limpiar Todo" message={confirmClearAllMessage} confirmButtonText="Sí, Eliminar Todo" confirmButtonClass="bg-red-600 hover:bg-red-700 text-white" cancelButtonText="No, Cancelar" cancelButtonClass="bg-gray-300 hover:bg-gray-400 text-gray-800" on:confirm={handleConfirmClearAll} on:cancel={handleCancelClearAll} /> {/if}
 

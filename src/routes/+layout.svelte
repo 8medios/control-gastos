@@ -14,6 +14,5 @@
 	</header>
 
 	<main class="container mx-auto p-4">
-		<slot /> <!-- ✅ Esto inserta el contenido hijo -->
-	</main>
+		<slot /> </main>
 </div>
