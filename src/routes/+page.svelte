@@ -52,23 +52,24 @@
 		transactionToDeleteId = null;
 		confirmDeleteMessage = "";
 	};
+	const handleCancelClearAll = () => {
+		isConfirmClearAllOpen = false;
+	};
 	const handleCancelDelete = () => {
 		isConfirmDeleteOpen = false;
 		transactionToDeleteId = null;
 		confirmDeleteMessage = "";
 	};
 
-	const handleRequestClearAll = () => { // <-- Estas funciones están definidas aquí
+	const handleRequestClearAll = () => {
 		isConfirmClearAllOpen = true;
 	};
+
 	const handleConfirmClearAll = () => { // <-- Estas funciones están definidas aquí
 		expenses.set([]);
 		isConfirmClearAllOpen = false;
 	};
-	const handleCancelClearAll = () => { // <-- Estas funciones están definidas aquí
-		isConfirmClearAllOpen = false;
-	};
-
+	
 	// Lógica de edición
 	// Ahora almacenamos solo el ID de la transacción que se está editando
 	let editingExpenseId: string | null = null;
@@ -592,6 +593,8 @@
 		}, 0);
 	};
 
+	// Estado para controlar si la sección de filtros está expandida o colapsada
+	let filtersExpanded = false;
 
 </script>
 
@@ -669,7 +672,7 @@
 				</div>
 			</section>
 
-			<section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full space-y-4 flex flex-col h-96 overflow-hidden">
+			<section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full space-y-4 flex flex-col">
 				<div class="flex justify-between items-center">
 					<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Transacciones</h2>
 					<button
@@ -680,81 +683,91 @@
 					</button>
 				</div>
 				<div class="space-y-4 flex-grow overflow-y-auto pr-2 custom-scrollbar">
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div>
-							<label for="filter-type" class="font-semibold block text-gray-700 dark:text-gray-300">Filtrar por Tipo:</label>
-							<select
-								id="filter-type"
-								bind:value={filterType}
-								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-							>
-								<option value="all">Todos</option>
-								<option value="expense">Gastos</option>
-								<option value="income">Ingresos</option>
-							</select>
-						</div>
 
-						<div>
-							<label for="filter-category" class="font-semibold block text-gray-700 dark:text-gray-300">Filtrar por Categoría (Gastos):</label>
-							<select
-								id="filter-category"
-								bind:value={filterCategory}
-								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-							>
-								<option value="Todas">Todas las categorías</option>
-								{#each $categories as cat}
-									<option value={cat}>{cat}</option>
-								{/each}
-							</select>
-						</div>
+					<details open={filtersExpanded} on:toggle={(e: Event) => filtersExpanded = (e.target as HTMLDetailsElement).open}>
+						<summary class="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+							Filtros y Búsqueda
+							<span class="float-right">
+								{#if filtersExpanded}
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 inline-block align-middle"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+								{:else}
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 inline-block align-middle"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>
+								{/if}
+							</span>
+						</summary>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+							<div>
+								<label for="filter-type" class="font-semibold block text-gray-700 dark:text-gray-300">Tipo:</label>
+								<select
+									id="filter-type"
+									bind:value={filterType}
+									class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								>
+									<option value="all">Todos</option>
+									<option value="expense">Gastos</option>
+									<option value="income">Ingresos</option>
+								</select>
+							</div>
 
-						<div>
-							<label for="filter-start-date" class="font-semibold block text-gray-700 dark:text-gray-300">Fecha Inicio:</label>
-							<input
-								id="filter-start-date"
-								type="date"
-								bind:value={filterStartDate}
-								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-							/>
-						</div>
+							<div>
+								<label for="filter-category" class="font-semibold block text-gray-700 dark:text-gray-300">Categoría (Gastos):</label>
+								<select
+									id="filter-category"
+									bind:value={filterCategory}
+									class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								>
+									<option value="Todas">Todas las categorías</option>
+									{#each $categories as cat}
+										<option value={cat}>{cat}</option>
+									{/each}
+								</select>
+							</div>
 
-						<div>
-							<label for="filter-end-date" class="font-semibold block text-gray-700 dark:text-gray-300">Fecha Fin:</label>
-							<input
-								id="filter-end-date"
-								type="date"
-								bind:value={filterEndDate}
-								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-							/>
-						</div>
+							<div>
+								<label for="filter-start-date" class="font-semibold block text-gray-700 dark:text-gray-300">Fecha Inicio:</label>
+								<input
+									id="filter-start-date"
+									type="date"
+									bind:value={filterStartDate}
+									class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								/>
+							</div>
 
-						<div class="sm:col-span-2">
-							<label for="search-term" class="font-semibold block text-gray-700 dark:text-gray-300">Buscar por Descripción:</label>
-							<input
-								id="search-term"
-								type="text"
-								placeholder="Buscar..."
-								bind:value={searchTerm}
-								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-							/>
-						</div>
+							<div>
+								<label for="filter-end-date" class="font-semibold block text-gray-700 dark:text-gray-300">Fecha Fin:</label>
+								<input
+									id="filter-end-date"
+									type="date"
+									bind:value={filterEndDate}
+									class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								/>
+							</div>
 
-						<div class="sm:col-span-2">
-							<label for="sort-order" class="font-semibold block text-gray-700 dark:text-gray-300">Ordenar por:</label>
-							<select
-								id="sort-order"
-								bind:value={sortOrder}
-								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-							>
-								<option value="date-desc">Fecha (Más recientes primero)</option>
-								<option value="date-asc">Fecha (Más antiguas primero)</option>
-								<option value="amount-desc">Monto (Mayor primero)</option>
-								<option value="amount-asc">Monto (Menor primero)</option>
-							</select>
+							<div class="md:col-span-2"> <label for="search-term" class="font-semibold block text-gray-700 dark:text-gray-300">Buscar por Descripción:</label>
+								<input
+									id="search-term"
+									type="text"
+									placeholder="Buscar..."
+									bind:value={searchTerm}
+									class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								/>
+							</div>
+
+							<div class="md:col-span-2"> <label for="sort-order" class="font-semibold block text-gray-700 dark:text-gray-300">Ordenar por:</label>
+								<select
+									id="sort-order"
+									bind:value={sortOrder}
+									class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								>
+									<option value="date-desc">Fecha (Más recientes primero)</option>
+									<option value="date-asc">Fecha (Más antiguas primero)</option>
+									<option value="amount-desc">Monto (Mayor primero)</option>
+									<option value="amount-asc">Monto (Menor primero)</option>
+								</select>
+							</div>
 						</div>
-					</div>
-					<ul class="w-full space-y-2">
-						{#each filteredAndSortedExpenses as transaction (transaction.id)}
+						</details>
+					<ul class="w-full space-y-2 mt-4"> {#each filteredAndSortedExpenses as transaction (transaction.id)}
 							<TransactionItem
 								{transaction}
 								on:requestDelete={handleRequestDelete}
