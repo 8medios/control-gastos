@@ -1,8 +1,9 @@
 // src/lib/stores.ts
 import { writable } from 'svelte/store';
+import type { Transaction, BudgetConfig } from './types';
 import { browser } from '$app/environment';
 // Importamos el nuevo tipo Transaction
-import type { Transaction } from './types';
+// import type { Transaction } from './types';
 
 // Función para cargar y "migrar" datos antiguos si es necesario
 const loadTransactions = (): Transaction[] => {
@@ -44,7 +45,9 @@ const loadTransactions = (): Transaction[] => {
 const initial: Transaction[] = loadTransactions();
 
 // El store ahora es de tipo Writable de Transaction[]
-export const expenses = writable<Transaction[]>(initial); // El nombre del store sigue siendo 'expenses' por consistencia si no queremos renombrarlo en todos lados
+export const expenses = writable<Transaction[]>([]);
+export const budget = writable<BudgetConfig>({ amount: 0, startDate: '' });
+export const categories = writable<string[]>(['Comida', 'Transporte', 'Entretenimiento']); // Or whatever your initial categories are
 
 if (browser) {
 	expenses.subscribe((val) => {

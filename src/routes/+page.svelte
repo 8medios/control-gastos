@@ -4,13 +4,13 @@
 	import EditTransactionModal from "$lib/components/EditTransactionModal.svelte";
 	import ConfirmModal from "$lib/components/ConfirmModal.svelte";
 	import type { Transaction, BudgetConfig } from "$lib/types";
-	import { expenses } from "$lib/stores";
-	import { budget } from "$lib/config";
+	// Importar los stores necesarios desde $lib/stores
+	import { expenses, budget, categories } from "$lib/stores";
 
 	// Importar Chart.js directamente
 	import Chart from "chart.js/auto"; // Importa Chart.js (usa 'auto' para registrar controladores básicos)
 	import { onMount, onDestroy } from "svelte"; // Importar hooks de ciclo de vida
-    import { browser } from '$app/environment'; // Importar 'browser' para verificar si estamos en el navegador
+	import { browser } from '$app/environment'; // Importar 'browser' para verificar si estamos en el navegador
 
 	const handleAddTransaction = (e: CustomEvent<Transaction>) => {
 		expenses.update((list) => [e.detail, ...list]);
@@ -58,41 +58,28 @@
 		confirmDeleteMessage = "";
 	};
 
-	const handleRequestClearAll = () => {
+	const handleRequestClearAll = () => { // <-- Estas funciones están definidas aquí
 		isConfirmClearAllOpen = true;
 	};
-	const handleConfirmClearAll = () => {
+	const handleConfirmClearAll = () => { // <-- Estas funciones están definidas aquí
 		expenses.set([]);
 		isConfirmClearAllOpen = false;
 	};
-	const handleCancelClearAll = () => {
+	const handleCancelClearAll = () => { // <-- Estas funciones están definidas aquí
 		isConfirmClearAllOpen = false;
 	};
 
 	// Lógica de edición
-	let editingExpense: Transaction | null = null;
+	// Ahora almacenamos solo el ID de la transacción que se está editando
+	let editingExpenseId: string | null = null;
+
 	const handleStartEditing = (e: CustomEvent<string>) => {
 		const idToEdit = e.detail;
-		const transactionToEdit = $expenses.find(
-			(transaction) => transaction.id === idToEdit
-		);
-		if (
-			transactionToEdit &&
-			transactionToEdit.id &&
-			transactionToEdit.name !== undefined &&
-			transactionToEdit.amount !== undefined &&
-			transactionToEdit.type
-		) {
-			editingExpense = { ...transactionToEdit };
-		} else {
-			console.warn(
-				"Intento de editar una transacción inválida o no encontrada:",
-				idToEdit,
-				transactionToEdit
-			);
-			editingExpense = null;
-		}
+		// Simplemente establecemos el ID de la transacción a editar.
+		// El modal se encargará de encontrar la transacción por este ID.
+		editingExpenseId = idToEdit;
 	};
+
 	const handleModalSave = (e: CustomEvent<Transaction>) => {
 		const updatedTransaction = e.detail;
 		expenses.update((list) => {
@@ -103,29 +90,47 @@
 				return transaction;
 			});
 		});
-		editingExpense = null;
+		// Después de guardar, cerramos el modal estableciendo editingExpenseId a null
+		editingExpenseId = null;
 	};
+
 	const handleModalCancel = () => {
-		editingExpense = null;
+		// Al cancelar, simplemente cerramos el modal estableciendo editingExpenseId a null
+		editingExpenseId = null;
 	};
+
+	// --- Lógica para obtener la transacción a editar ---
+	// Bloque reactivo para encontrar la transacción a editar cuando editingExpenseId cambia
+	$: transactionToEdit = $expenses.find(tx => tx.id === editingExpenseId);
 
 
 	// Cálculos basados en el periodo de presupuesto
+	// Modificado para manejar startDate inválido
 	$: totalGastos = $expenses.reduce((acc, item) => {
+		const periodEndDate = getPeriodEndDate($budget.startDate);
+		// Solo calcular si periodEndDate es válido
 		if (
 			item.type === "expense" &&
+			$budget.startDate && // Asegurarse de que startDate no esté vacío
+			periodEndDate && // Asegurarse de que periodEndDate sea válido
 			item.date >= $budget.startDate &&
-			item.date <= getPeriodEndDate($budget.startDate)
+			item.date <= periodEndDate
 		) {
 			return acc + item.amount;
 		}
 		return acc;
 	}, 0);
+
+	// Modificado para manejar startDate inválido
 	$: totalIngresos = $expenses.reduce((acc, item) => {
+		const periodEndDate = getPeriodEndDate($budget.startDate);
+		// Solo calcular si periodEndDate es válido
 		if (
 			item.type === "income" &&
+			$budget.startDate && // Asegurarse de que startDate no esté vacío
+			periodEndDate && // Asegurarse de que periodEndDate sea válido
 			item.date >= $budget.startDate &&
-			item.date <= getPeriodEndDate($budget.startDate)
+			item.date <= periodEndDate
 		) {
 			return acc + item.amount;
 		}
@@ -133,27 +138,62 @@
 	}, 0);
 
 	// Función auxiliar para obtener la fecha de fin del periodo
-	function getPeriodEndDate(startDateString: string): string {
+	// Modificada para devolver null si startDateString es inválido
+	function getPeriodEndDate(startDateString: string): string | null {
+		if (!startDateString) {
+			return null; // Retorna null si la cadena de fecha de inicio está vacía
+		}
 		const start = new Date(startDateString);
+		// Comprobar si la fecha inicial es válida
+		if (isNaN(start.getTime())) {
+			console.error("Fecha de inicio de presupuesto inválida:", startDateString);
+			return null; // Retorna null si la fecha es inválida
+		}
+
 		const endOfPeriod = new Date(
 			start.getFullYear(),
 			start.getMonth() + 1,
 			start.getDate()
 		);
-		const endDate = new Date(endOfPeriod.getTime() - 1000 * 60 * 60 * 24)
-			.toISOString()
-			.slice(0, 10);
-		return endDate;
+		// Comprobar si la fecha calculada es válida
+		if (isNaN(endOfPeriod.getTime())) {
+			console.error("Fecha de fin de periodo calculada inválida.");
+			return null; // Retorna null si la fecha calculada es inválida
+		}
+
+		// Restar un día para obtener el último día del mes (o periodo)
+		const endDate = new Date(endOfPeriod.getTime() - 1000 * 60 * 60 * 24);
+
+		// Comprobar si la fecha final es válida antes de formatear
+		if (isNaN(endDate.getTime())) {
+			console.error("Fecha de fin de periodo final inválida.");
+			return null; // Retorna null si la fecha final es inválida
+		}
+
+		return endDate.toISOString().slice(0, 10);
 	}
 
 	// Función para obtener todas las fechas dentro de un rango
+	// Modificada para manejar fechas de inicio/fin inválidas
 	function getDatesInRange(
-		startDateString: string,
-		endDateString: string
+		startDateString: string | null, // Puede ser null ahora
+		endDateString: string | null // Puede ser null ahora
 	): string[] {
 		const dateArray: string[] = [];
+		if (!startDateString || !endDateString) {
+			return dateArray; // Retorna array vacío si alguna fecha es nula o vacía
+		}
+
 		let currentDate = new Date(startDateString);
 		const endDate = new Date(endDateString);
+
+		// Comprobar si las fechas son válidas antes de iterar
+		if (isNaN(currentDate.getTime()) || isNaN(endDate.getTime())) {
+			console.error("Fechas de rango inválidas para getDatesInRange.");
+			return dateArray; // Retorna array vacío si las fechas son inválidas
+		}
+
+
 		while (currentDate <= endDate) {
 			dateArray.push(currentDate.toISOString().slice(0, 10));
 			currentDate.setDate(currentDate.getDate() + 1);
@@ -161,31 +201,62 @@
 		return dateArray;
 	}
 
+	// Modificado para manejar startDate inválido
 	$: restante = $budget.amount + totalIngresos - totalGastos;
-	$: diasRestantesPeriodo = calcularDiasRestantesPeriodo($budget.startDate);
+
+	// Modificado para manejar startDate inválido
+	$: diasRestantesPeriodo = $budget.startDate ? calcularDiasRestantesPeriodo($budget.startDate) : 0; // Si startDate es inválido, días restantes es 0
+
 	$: diario = (
 		restante / (diasRestantesPeriodo > 0 ? diasRestantesPeriodo : 1)
 	).toFixed(2);
 	$: semanal = (
 		restante / (diasRestantesPeriodo > 0 ? diasRestantesPeriodo / 7 : 1)
 	).toFixed(2);
+
+	// Modificado para manejar startDate inválido
 	function calcularDiasTotalesPeriodo(startDateString: string): number {
+		if (!startDateString) {
+			return 0; // Retorna 0 si la cadena de fecha de inicio está vacía
+		}
 		const start = new Date(startDateString);
+		if (isNaN(start.getTime())) {
+			console.error("Fecha de inicio de presupuesto inválida para calcularDiasTotalesPeriodo:", startDateString);
+			return 0; // Retorna 0 si la fecha es inválida
+		}
+
 		const endOfPeriod = new Date(
 			start.getFullYear(),
 			start.getMonth() + 1,
 			start.getDate()
 		);
+		if (isNaN(endOfPeriod.getTime())) {
+			console.error("Fecha de fin de periodo calculada inválida para calcularDiasTotalesPeriodo.");
+			return 0; // Retorna 0 si la fecha calculada es inválida
+		}
+
 		const diffTime = endOfPeriod.getTime() - start.getTime();
 		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 		return diffDays;
 	}
+
+	// Modificado para manejar startDate inválido
 	function calcularDiasRestantesPeriodo(startDateString: string): number {
+		if (!startDateString) {
+			return 0; // Retorna 0 si la cadena de fecha de inicio está vacía
+		}
 		const hoy = new Date();
 		hoy.setHours(0, 0, 0, 0);
 
 		const start = new Date(startDateString);
 		start.setHours(0, 0, 0, 0);
+
+		// Comprobar si la fecha inicial es válida
+		if (isNaN(start.getTime())) {
+			console.error("Fecha de inicio de presupuesto inválida para calcularDiasRestantesPeriodo:", startDateString);
+			return 0; // Retorna 0 si la fecha es inválida
+		}
+
 
 		const endOfPeriod = new Date(
 			start.getFullYear(),
@@ -193,6 +264,13 @@
 			start.getDate()
 		);
 		endOfPeriod.setHours(0, 0, 0, 0);
+
+		// Comprobar si la fecha de fin calculada es válida
+		if (isNaN(endOfPeriod.getTime())) {
+			console.error("Fecha de fin de periodo calculada inválida para calcularDiasRestantesPeriodo.");
+			return 0; // Retorna 0 si la fecha calculada es inválida
+		}
+
 
 		if (hoy < start) {
 			return calcularDiasTotalesPeriodo(startDateString);
@@ -206,30 +284,54 @@
 		return diffDays;
 	}
 
+
 	const clearExpenses = () => {
 		if (confirm("¿Borrar todas las transacciones?")) {
 			expenses.set([]);
 		}
 	};
 
-	let categoriaSeleccionada: string = "Todas";
+	// --- Variables de Estado para Filtrado y Búsqueda ---
+	let filterCategory: string = "Todas"; // Ya existente, ahora parte de los filtros
+	let filterType: "all" | "expense" | "income" = "all"; // Filtro por tipo
+	let filterStartDate: string = ""; // Filtro por fecha de inicio
+	let filterEndDate: string = ""; // Filtro por fecha de fin
+	let searchTerm: string = ""; // Término de búsqueda por descripción
+	let sortOrder: "date-desc" | "date-asc" | "amount-desc" | "amount-asc" = "date-desc"; // Ordenación
 
-	$: gastosFiltrados = $expenses.filter((transaction) => {
-		const isExpense = transaction.type === "expense";
-		const matchesCategory =
-			categoriaSeleccionada === "Todas" ||
-			(isExpense && transaction.category === categoriaSeleccionada);
-		return (isExpense && matchesCategory) || transaction.type === "income";
-	});
+	// --- Lógica de Filtrado, Búsqueda y Ordenación ---
+	$: filteredAndSortedExpenses = $expenses
+		.filter(transaction => {
+			// Aplicar filtro por categoría (solo a gastos)
+			const categoryMatch = filterCategory === "Todas" ||
+				(transaction.type === "expense" && transaction.category === filterCategory);
 
-	const categories = [
-		"Alimentación",
-		"Transporte",
-		"Entretenimiento",
-		"Salud",
-		"Educación",
-		"Otros",
-	];
+			// Aplicar filtro por tipo
+			const typeMatch = filterType === "all" || transaction.type === filterType;
+
+			// Aplicar filtro por rango de fechas
+			const dateMatch = (!filterStartDate || transaction.date >= filterStartDate) &&
+				(!filterEndDate || transaction.date <= filterEndDate);
+
+			// Aplicar búsqueda por término (insensible a mayúsculas/minúsculas)
+			const searchMatch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+			return categoryMatch && typeMatch && dateMatch && searchMatch;
+		})
+		.sort((a, b) => {
+			// Aplicar ordenación
+			if (sortOrder === "date-desc") {
+				return new Date(b.date).getTime() - new Date(a.date).getTime();
+			} else if (sortOrder === "date-asc") {
+				return new Date(a.date).getTime() - new Date(b.date).getTime();
+			} else if (sortOrder === "amount-desc") {
+				return b.amount - a.amount;
+			} else if (sortOrder === "amount-asc") {
+				return a.amount - b.amount;
+			}
+			return 0; // Orden por defecto si no coincide (aunque siempre debería coincidir)
+		});
+
 
 	$: totalFondosDisponibles = $budget.amount + totalIngresos;
 	$: porcentajeGastado =
@@ -243,11 +345,11 @@
 			? "bg-yellow-500"
 			: "bg-red-500";
 
-	// ** DATOS Y OPCIONES PARA LOS GRÁFICOS **
+	// ** Datos y Opciones para los Gráficos **
 	import { readable } from "svelte/store";
 
 	const isDarkMode = readable(false, (set) => {
-		if (!browser) return;
+		if (!browser) return; // Asegurarse de estar en el navegador
 		const observer = new MutationObserver(() => {
 			set(document.body.classList.contains("dark"));
 		});
@@ -259,14 +361,17 @@
 		return () => observer.disconnect();
 	});
 
-	// --- Datos para el GRÁFICO DE BARRAS (Gastos/Ingresos Diarios) ---
+	// --- Datos para el Gráfico de Barras (Gastos/Ingresos Diarios) ---
+	// Modificado para manejar startDate inválido
 	$: periodStartDate = $budget.startDate;
-	$: periodEndDate = getPeriodEndDate(periodStartDate);
-	$: chartLabels = getDatesInRange(periodStartDate, periodEndDate);
+	$: periodEndDate = getPeriodEndDate(periodStartDate); // periodEndDate ahora puede ser null
+	$: chartLabels = getDatesInRange(periodStartDate, periodEndDate); // getDatesInRange maneja nulls
 	$: dailyTotals = $expenses.reduce(
 		(acc, transaction) => {
+			// Solo calcular si periodEndDate es válido
 			if (
 				transaction.date >= periodStartDate &&
+				periodEndDate && // Asegurarse de que periodEndDate sea válido
 				transaction.date <= periodEndDate
 			) {
 				if (!acc[transaction.date]) {
@@ -355,12 +460,13 @@
 		},
 	};
 
-	// --- Datos para el GRÁFICO DE TARTA (Gastos por Categoría) ---
-	$: periodExpenses = $expenses.filter(t => t.type === 'expense' && t.date >= periodStartDate && t.date <= periodEndDate);
-	$: categoryTotals = periodExpenses.reduce((acc, transaction) => { /* ... */ const category = transaction.category || 'Otros'; if (!acc[category]) { acc[category] = 0; } acc[category] += transaction.amount; return acc; }, {} as Record<string, number>);
+	// --- Datos para el Gráfico de Tarta (Gastos por Categoría) ---
+	// Modificado para manejar startDate inválido
+	$: periodExpenses = $expenses.filter(t => t.type === 'expense' && $budget.startDate && periodEndDate && t.date >= $budget.startDate && t.date <= periodEndDate); // periodEndDate puede ser null
+	$: categoryTotals = periodExpenses.reduce((acc, transaction) => { const category = transaction.category || 'Otros'; if (!acc[category]) { acc[category] = 0; } acc[category] += transaction.amount; return acc; }, {} as Record<string, number>);
 	$: pieChartLabels = Object.keys(categoryTotals);
 	$: pieChartDataValues = Object.values(categoryTotals);
-	function generateColors(numColors: number): string[] { /* ... */ const colors = [ '#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#A855F7', '#EC4899', '#6EE7B7', '#FCD34D', '#F87171', '#818CF8', '#C084FC', '#F472B6', '#A7F3D0', '#FDE68A' ]; const generated = []; for(let i = 0; i < numColors; i++){ generated.push(colors[i % colors.length]); } return generated; }
+	function generateColors(numColors: number): string[] { const colors = [ '#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#A855F7', '#EC4899', '#6EE7B7', '#FCD34D', '#F87171', '#818CF8', '#C084FC', '#F472B6', '#A7F3D0', '#FDE68A' ]; const generated = []; for(let i = 0; i < numColors; i++){ generated.push(colors[i % colors.length]); } return generated; }
 	$: pieChartDatasets = [ { label: 'Gasto por Categoría', data: pieChartDataValues, backgroundColor: generateColors(pieChartLabels.length), borderColor: $isDarkMode ? '#1F2937' : '#FFFFFF', borderWidth: 1, } ];
 	$: pieChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Distribución de Gastos por Categoría', color: $isDarkMode ? '#E5E7EB' : '#1F2937', }, legend: { display: true, position: 'top' as const, labels: { color: $isDarkMode ? '#D1D5DB' : '#4B5563', } }, tooltip: { backgroundColor: $isDarkMode ? 'rgba(229, 231, 235, 0.9)' : 'rgba(31, 41, 55, 0.9)', titleColor: $isDarkMode ? '#1F2937' : '#E5E7EB', bodyColor: $isDarkMode ? '#1F2937' : '#E5E7EB', borderColor: $isDarkMode ? '#4B5563' : '#D1D5DB', borderWidth: 1, cornerRadius: 4, callbacks: { label: function(context: any) { const label = context.label || ''; const value = context.raw || 0; const total = context.chart.data.datasets[0].data.reduce((sum: number, val: number) => sum + val, 0); const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0; return `${label}: $${value.toFixed(2)} (${percentage}%)`; } } } } };
 
@@ -376,12 +482,12 @@
 	onMount(() => {
 		if (!browser) return; // Asegurarse de estar en el navegador
 
-		// Crear GRÁFICO DE BARRAS
+		// Crear Gráfico de Barras
 		const barCtx = barCanvasElement.getContext("2d");
 		if (!barCtx) { console.error("Could not get bar canvas context"); return; }
 		myBarChart = new Chart(barCtx, { type: "bar", data: { labels: chartLabels, datasets: barChartDatasets, }, options: barChartOptions, });
 
-		// Crear GRÁFICO DE TARTA
+		// Crear Gráfico de Tarta
 		const pieCtx = pieCanvasElement.getContext("2d");
 		if (!pieCtx) { console.error("Could not get pie canvas context"); return; }
 		myPieChart = new Chart(pieCtx, { type: "pie", data: { labels: pieChartLabels, datasets: pieChartDatasets }, options: pieChartOptions, });
@@ -441,8 +547,8 @@
 		const csvRows = data.map((transaction, index) => { // MODIFICADO: Añadido 'index'
 			// Función auxiliar para escapar delimitadores y dobles comillas en campos
 			const escapeCsvField = (field: any) => {
-                if (field === null || field === undefined) return '';
-                const stringField = String(field);
+				if (field === null || field === undefined) return '';
+				const stringField = String(field);
 				// Escapar campos si contienen el delimitador (punto y coma), comillas dobles o salto de línea
 				if (stringField.includes(';') || stringField.includes('"') || stringField.includes('\n')) { // Escapando ';'
 					// Si el campo contiene punto y coma, comillas dobles o salto de línea, enciérralo entre comillas dobles
@@ -563,7 +669,8 @@
 				</div>
 			</section>
 
-			<section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full space-y-4 flex flex-col h-96 overflow-hidden"> <div class="flex justify-between items-center">
+			<section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 w-full space-y-4 flex flex-col h-96 overflow-hidden">
+				<div class="flex justify-between items-center">
 					<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Transacciones</h2>
 					<button
 						on:click={handleRequestClearAll}
@@ -572,64 +679,122 @@
 						Limpiar todas
 					</button>
 				</div>
-                <div class="space-y-2 flex-grow overflow-y-auto pr-2 custom-scrollbar"> <label for="categoria" class="font-semibold block"
-						>Filtrar por categoría (Gastos):</label
-					>
-					<select
-						id="categoria"
-						bind:value={categoriaSeleccionada}
-						class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-					>
-						<option value="Todas">Todas las categorías</option>
-						<option value="Alimentación">Alimentación</option>
-						<option value="Transporte">Transporte</option>
-						<option value="Entretenimiento">Entretenimiento</option>
-						<option value="Salud">Salud</option>
-						<option value="Educación">Educación</option>
-						<option value="Otros">Otros</option>
-					</select>
-                    <ul class="w-full space-y-2">
-                        {#each gastosFiltrados as transaction (transaction.id)}
-                            <TransactionItem
-                                {transaction}
-                                on:requestDelete={handleRequestDelete}
-                                on:edit={handleStartEditing}
-                            />
-                        {/each}
-                         {#if $expenses.length === 0}
-                             <p class="text-center text-gray-500 dark:text-gray-400 py-8">Aún no hay transacciones.</p>
-                        {/if}
-                    </ul>
-                </div>
+				<div class="space-y-4 flex-grow overflow-y-auto pr-2 custom-scrollbar">
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label for="filter-type" class="font-semibold block text-gray-700 dark:text-gray-300">Filtrar por Tipo:</label>
+							<select
+								id="filter-type"
+								bind:value={filterType}
+								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+							>
+								<option value="all">Todos</option>
+								<option value="expense">Gastos</option>
+								<option value="income">Ingresos</option>
+							</select>
+						</div>
+
+						<div>
+							<label for="filter-category" class="font-semibold block text-gray-700 dark:text-gray-300">Filtrar por Categoría (Gastos):</label>
+							<select
+								id="filter-category"
+								bind:value={filterCategory}
+								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+							>
+								<option value="Todas">Todas las categorías</option>
+								{#each $categories as cat}
+									<option value={cat}>{cat}</option>
+								{/each}
+							</select>
+						</div>
+
+						<div>
+							<label for="filter-start-date" class="font-semibold block text-gray-700 dark:text-gray-300">Fecha Inicio:</label>
+							<input
+								id="filter-start-date"
+								type="date"
+								bind:value={filterStartDate}
+								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+							/>
+						</div>
+
+						<div>
+							<label for="filter-end-date" class="font-semibold block text-gray-700 dark:text-gray-300">Fecha Fin:</label>
+							<input
+								id="filter-end-date"
+								type="date"
+								bind:value={filterEndDate}
+								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+							/>
+						</div>
+
+						<div class="sm:col-span-2">
+							<label for="search-term" class="font-semibold block text-gray-700 dark:text-gray-300">Buscar por Descripción:</label>
+							<input
+								id="search-term"
+								type="text"
+								placeholder="Buscar..."
+								bind:value={searchTerm}
+								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+							/>
+						</div>
+
+						<div class="sm:col-span-2">
+							<label for="sort-order" class="font-semibold block text-gray-700 dark:text-gray-300">Ordenar por:</label>
+							<select
+								id="sort-order"
+								bind:value={sortOrder}
+								class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+							>
+								<option value="date-desc">Fecha (Más recientes primero)</option>
+								<option value="date-asc">Fecha (Más antiguas primero)</option>
+								<option value="amount-desc">Monto (Mayor primero)</option>
+								<option value="amount-asc">Monto (Menor primero)</option>
+							</select>
+						</div>
+					</div>
+					<ul class="w-full space-y-2">
+						{#each filteredAndSortedExpenses as transaction (transaction.id)}
+							<TransactionItem
+								{transaction}
+								on:requestDelete={handleRequestDelete}
+								on:edit={handleStartEditing}
+								/>
+						{/each}
+						{#if filteredAndSortedExpenses.length === 0}
+							<p class="text-center text-gray-500 dark:text-gray-400 py-8">No se encontraron transacciones con los filtros aplicados.</p>
+						{/if}
+					</ul>
+				</div>
 			</section>
 		</div>
 
 		<div class="w-full md:w-1/2 flex flex-col gap-6">
 
 			<section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 space-y-2">
-				 <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                    Nueva Transacción
-                 </h2>
+					<h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+						Nueva Transacción
+					</h2>
 				<AddTransaction on:add={handleAddTransaction} class="w-full" />
 			</section>
 
 			<section class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 flex flex-col gap-4">
-                <button
-                    on:click={scrollToCharts}
-                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-lg font-semibold transition"
-                > Ver Gráficos
-                </button>
-                <a
-                    href="/configuration"
-                    class="block text-center w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
-                > Ir a Configuración
-                </a>
-                 <button
-                    on:click={exportTransactionsAsCsv} 
-                    class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
-                 > Exportar Datos
-                 </button>
-             </section>
+				<button
+					on:click={scrollToCharts}
+					class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-lg font-semibold transition"
+				> Ver Gráficos
+				</button>
+				<a
+					href="/configuration"
+					class="block text-center w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
+				> Ir a Configuración
+				</a>
+					<button
+					on:click={exportTransactionsAsCsv}
+					class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
+					> Exportar Datos
+					</button>
+			</section>
 
 		</div>
 
@@ -659,15 +824,20 @@
 			</div>
 			{#if pieChartDataValues.length === 0 && periodExpenses.length > 0}
 				<p class="text-center text-gray-500 dark:text-gray-400 text-sm">No hay gastos con categoría en este periodo para mostrar en el gráfico de tarta.</p>
-		   {/if}
+			{/if}
 			{#if periodExpenses.length === 0}
-				 <p class="text-center text-gray-500 dark:text-gray-400 text-sm">No hay gastos en este periodo para mostrar en el gráfico de tarta.</p>
+					<p class="text-center text-gray-500 dark:text-gray-400 text-sm">No hay gastos en este periodo para mostrar en el gráfico de tarta.</p>
 			{/if}
 		</section>
 
 	</section>
 
-	{#if editingExpense} <EditTransactionModal transaction={editingExpense} {categories} on:save={handleModalSave} on:cancel={handleModalCancel} /> {/if}
+	{#if editingExpenseId !== null}
+		{#if transactionToEdit}
+			<EditTransactionModal transaction={transactionToEdit} categories={$categories} on:save={handleModalSave} on:cancel={handleModalCancel} />
+		{/if}
+	{/if}
+
 	{#if isConfirmDeleteOpen} <ConfirmModal title="Confirmar Eliminación" message={confirmDeleteMessage} on:confirm={handleConfirmDelete} on:cancel={handleCancelDelete} /> {/if}
 	{#if isConfirmClearAllOpen} <ConfirmModal title="Confirmar Limpiar Todo" message={confirmClearAllMessage} confirmButtonText="Sí, Eliminar Todo" confirmButtonClass="bg-red-600 hover:bg-red-700 text-white" cancelButtonText="No, Cancelar" cancelButtonClass="bg-gray-300 hover:bg-gray-400 text-gray-800" on:confirm={handleConfirmClearAll} on:cancel={handleCancelClearAll} /> {/if}
 
@@ -681,15 +851,15 @@
 
 	.custom-scrollbar::-webkit-scrollbar-track {
 		background: transparent; /* Fondo transparente del riel */
-        border-radius: 10px;
+		border-radius: 10px;
 	}
 
-    /* Estilos para el pulgar (modo claro) */
+	/* Estilos para el pulgar (modo claro) */
 	.custom-scrollbar::-webkit-scrollbar-thumb {
 		background-color: rgba(0, 0, 0, 0.2); /* Color del pulgar (semitransparente oscuro) */
 		border-radius: 10px; /* Bordes redondeados del pulgar */
-        border: 2px solid transparent; /* Borde transparente para hacer el pulgar más delgado visualmente */
-        background-clip: content-box; /* Asegura que el borde no afecte el tamaño del fondo */
+		border: 2px solid transparent; /* Borde transparente para hacer el pulgar más delgado visualmente */
+		background-clip: content-box; /* Asegura que el borde no afecte el tamaño del fondo */
 	}
 
 	/* Estilos para el pulgar al pasar el ratón (modo claro) */
@@ -697,37 +867,37 @@
 		background-color: rgba(0, 0, 0, 0.3); /* Pulgar un poco más visible al pasar el ratón */
 	}
 
-    /* Estilos para el pulgar en modo oscuro usando :global() */
-    :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
-        background-color: rgba(255, 255, 255, 0.3); /* Pulgar semitransparente claro en modo oscuro */
-         border-color: transparent; /* Mantener borde transparente */
-    }
-     :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: rgba(255, 255, 255, 0.5); /* Pulgar más visible en modo oscuro al pasar el ratón */
-         border-color: transparent; /* Mantener borde transparente */
-    }
+	/* Estilos para el pulgar en modo oscuro usando :global() */
+	:global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
+		background-color: rgba(255, 255, 255, 0.3); /* Pulgar semitransparente claro en modo oscuro */
+			border-color: transparent; /* Mantener borde transparente */
+	}
+		:global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+		background-color: rgba(255, 255, 255, 0.5); /* Pulgar más visible en modo oscuro al pasar el ratón */
+			border-color: transparent; /* Mantener borde transparente */
+	}
 
 
 	/* Estilos básicos para Firefox */
-    /* Nota: Firefox styling is limited compared to Webkit */
+	/* Nota: Firefox styling is limited compared to Webkit */
 	.custom-scrollbar {
 		scrollbar-width: thin; /* "auto" o "thin" */
 		scrollbar-color: rgba(0, 0, 0, 0.2) transparent; /* color del pulgar y color del track (transparente) */
 	}
 
-    /* Estilos básicos para Firefox en modo oscuro usando :global() */
-     :global(.dark) .custom-scrollbar {
-        scrollbar-color: rgba(255, 255, 255, 0.3) transparent; /* color del pulgar y color del track (transparente) en modo oscuro */
-     }
+	/* Estilos básicos para Firefox en modo oscuro usando :global() */
+		:global(.dark) .custom-scrollbar {
+		scrollbar-color: rgba(255, 255, 255, 0.3) transparent; /* color del pulgar y color del track (transparente) en modo oscuro */
+		}
 
 	/* Esconder la barra de scroll en IE y Edge anterior */
 	.custom-scrollbar {
-	  -ms-overflow-style: none;
+		-ms-overflow-style: none;
 	}
 
 	/* Esconder la barra de scroll en navegadores Webkit pero mantener la funcionalidad */
 	/* .custom-scrollbar::-webkit-scrollbar {
-	  display: none;
+		display: none;
 	} */ /* Descomentar si quieres ocultar la barra pero mantener scroll */
 
 </style>
